@@ -71,6 +71,26 @@ body {
     }
 }
 
+@keyframes replayFinishedLineGrow {
+    0% {
+        transform: scaleX(0);
+    }
+
+    100% {
+        transform: scaleX(1);
+    }
+}
+
+@keyframes replayFinishedTextFadeIn {
+    0% {
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
 @keyframes typingFade {
     0% {
         opacity: 1;

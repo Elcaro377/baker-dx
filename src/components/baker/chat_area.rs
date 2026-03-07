@@ -276,6 +276,11 @@ pub fn ChatArea(
             id: String,
             content: String,
         },
+        TopicEnded {
+            id: String,
+            content: String,
+            animate: bool,
+        },
         Message {
             msg: Message,
             is_self: bool,
@@ -295,6 +300,14 @@ pub fn ChatArea(
             message_rows.push(ChatRow::Status {
                 id: msg.id.clone(),
                 content: msg.content.clone(),
+            });
+            continue;
+        }
+        if matches!(msg.kind, MessageKind::TopicEnded) {
+            message_rows.push(ChatRow::TopicEnded {
+                id: msg.id.clone(),
+                content: msg.content.clone(),
+                animate: msg.animate,
             });
             continue;
         }
@@ -624,6 +637,11 @@ pub fn ChatArea(
                                     "{content}"
                                 }
                             },
+                            ChatRow::TopicEnded { id, content, animate } => rsx! {
+                                div { class: "my-6", key: "{id}",
+                                    ReplayFinishedLine { content, animate }
+                                }
+                            },
                             ChatRow::Message {
                                 msg,
                                 is_self,
@@ -714,6 +732,45 @@ pub fn ChatArea(
                     }
                 }
             }
+        }
+    }
+}
+
+#[component]
+fn ReplayFinishedLine(content: String, animate: bool) -> Element {
+    let left_line_style = if animate {
+        "transform: scaleX(0); transform-origin: left center; animation: replayFinishedLineGrow 0.1s ease-out forwards;"
+    } else {
+        "transform: scaleX(1); transform-origin: left center;"
+    };
+    let right_line_style = if animate {
+        "transform: scaleX(0); transform-origin: right center; animation: replayFinishedLineGrow 0.1s ease-out forwards;"
+    } else {
+        "transform: scaleX(1); transform-origin: right center;"
+    };
+    let text_style = if animate {
+        "opacity: 0; animation: replayFinishedTextFadeIn 0.12s ease-out 0.17s forwards;"
+    } else {
+        "opacity: 1;"
+    };
+
+    rsx! {
+        div { class: "w-full grid grid-cols-[8px_1fr_auto_1fr_8px] items-center select-none",
+            div {}
+            div {
+                class: "flex-1 h-[2px] bg-[rgb(145,145,145)]",
+                style: "{left_line_style}",
+            }
+            span {
+                class: "px-2 text-[rgb(145,145,145)] text-xs font-bold tracking-wide whitespace-nowrap",
+                style: "{text_style}",
+                "{content}"
+            }
+            div {
+                class: "flex-1 h-[2px] bg-[rgb(145,145,145)]",
+                style: "{right_line_style}",
+            }
+            div {}
         }
     }
 }

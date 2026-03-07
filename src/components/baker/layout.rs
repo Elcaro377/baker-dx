@@ -90,15 +90,23 @@ fn schedule_animate_off_in_state(
     });
 }
 
-fn schedule_animate_off_in_list(mut list: Signal<Vec<Message>>, msg_id: String) {
+fn schedule_animate_off_in_list_with_delay(
+    mut list: Signal<Vec<Message>>,
+    msg_id: String,
+    delay_ms: u64,
+) {
     spawn(async move {
-        sleep_ms(220).await;
+        sleep_ms(delay_ms).await;
         list.with_mut(|msgs| {
             if let Some(msg) = msgs.iter_mut().find(|m| m.id == msg_id) {
                 msg.animate = false;
             }
         });
     });
+}
+
+fn schedule_animate_off_in_list(list: Signal<Vec<Message>>, msg_id: String) {
+    schedule_animate_off_in_list_with_delay(list, msg_id, 220);
 }
 
 fn schedule_reaction_animate_off_in_state(
@@ -750,6 +758,26 @@ pub fn BakerLayout() -> Element {
                             schedule_reaction_animate_off_in_list(replay_messages_async, msg_id);
                         }
                     }
+                }
+                if replay_token_async() == token {
+                    let topic_end_id = Uuid::new_v4().to_string();
+                    replay_messages_async.with_mut(|list| {
+                        list.push(Message {
+                            id: topic_end_id.clone(),
+                            sender_id: user_id.clone(),
+                            content: "话题结束，暂无新话题".to_string(),
+                            kind: MessageKind::TopicEnded,
+                            animate: true,
+                            animate_reactions: false,
+                            reactions: Vec::new(),
+                        });
+                    });
+                    need_to_scroll_down.set(true);
+                    schedule_animate_off_in_list_with_delay(
+                        replay_messages_async,
+                        topic_end_id,
+                        900,
+                    );
                 }
                 replay_pending_async.set(None);
             });
