@@ -608,7 +608,7 @@ pub fn ChatArea(
                         match row {
                             ChatRow::Status { id, content } => rsx! {
                                 div {
-                                    class: "text-center text-gray-500 text-xs my-2 font-mono cursor-context-menu",
+                                    class: "text-center text-gray-500 text-xs my-2 cursor-context-menu",
                                     key: "{id}",
                                     oncontextmenu: move |evt| {
                                         evt.prevent_default();
