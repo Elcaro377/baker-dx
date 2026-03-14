@@ -1,12 +1,14 @@
 use dioxus::prelude::*;
 
-use crate::components::baker::{capture, chat_area::ChatArea, Route};
+use crate::components::baker::{
+    capture, chat_area::ChatArea, download_image, modals::Modal, Route,
+};
 
 #[component]
 pub(super) fn CapturePage(contact_id: String) -> Element {
     let app_state = use_context::<Signal<crate::components::baker::models::AppState>>();
     let contacts = &app_state.read().contacts;
-    let mut img_src = use_signal(|| String::new());
+    let mut img_src = use_signal(String::new);
 
     let navigator = navigator();
 
@@ -33,16 +35,18 @@ pub(super) fn CapturePage(contact_id: String) -> Element {
     let stickers = use_memo(move || app_state.read().stickers.clone());
 
     let mut width = use_signal(|| 800i64);
-    let mut height = use_signal(|| 1200i64);
+    let mut scale = use_signal(|| 1.0f64);
+
+    let mut show_download_success = use_signal(|| false);
 
     use_effect(move || {
         width.read();
-        height.read();
+        scale.read();
 
         info!("effect");
 
         spawn(async move {
-            match capture("#chat_area").await {
+            match capture("#chat_area", scale()).await {
                 Some(src) => img_src.set(src),
                 None => error!("capture chat area failed"),
             }
@@ -82,11 +86,25 @@ pub(super) fn CapturePage(contact_id: String) -> Element {
     };
 
     rsx! {
+        if show_download_success() {
+            Modal {
+                title: "操作成功",
+                content_confirmation_button: "好",
+                on_close: move |_| show_download_success.set(false),
+                on_confirm: move |_| show_download_success.set(false),
+
+                {
+                    rsx! {
+                        p { class: "text-black", "已下载到用户的下载目录中。" }
+                    }
+                }
+            }
+        }
         div {
+            class: "h-auto",
             style: "transform: translateX(-325000px) translateY(-325000px); overflow-y: hidden",
             position: "absolute",
             width: "{width}px",
-            height: "{height}px",
             {chat_area}
         }
         div {
@@ -130,15 +148,42 @@ pub(super) fn CapturePage(contact_id: String) -> Element {
                             oninput: move |e| width.set(e.value().parse().unwrap_or(0)),
                         }
                     }
-                    div { class: "space-y-1",
-                        label { class: "block text-white text-sm", "高度" }
+                    div { class: "space-y-1 mt-4",
+                        label { class: "block text-white text-sm",
+                            "缩放倍率（如2x即为以两倍的分辨率截图）"
+                        }
                         input {
                             class: "w-full bg-[#e9e9e9] border border-black/10 rounded p-3 text-black text-sm focus:outline-none focus:border-black/30 resize-none",
                             r#type: "number",
-                            min: "500",
-                            step: "100",
-                            value: "{height}",
-                            oninput: move |e| height.set(e.value().parse().unwrap_or(0)),
+                            min: "0.1",
+                            max: "4.0",
+                            step: "0.1",
+                            value: "{scale}",
+                            oninput: move |e| {
+                                if let Ok(num) = e.value().parse::<f64>() {
+                                    scale.set(num)
+                                }
+                            },
+                            onblur: move |_| {
+                                if scale() > 4.0 {
+                                    scale.set(4.0);
+                                } else if scale() < 0.1 {
+                                    scale.set(0.1);
+                                }
+                            },
+                        }
+                    }
+                    div { class: "space-y-1 mt-10",
+                        button {
+                            class: "w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded text-sm font-medium transition-colors",
+                            onclick: move |_| {
+                                spawn(async move {
+                                    if download_image(&img_src(), "png", "download.png").await.is_ok() {
+                                        show_download_success.set(true)
+                                    }
+                                });
+                            },
+                            "下载"
                         }
                     }
                 }

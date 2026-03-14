@@ -6,7 +6,7 @@ use crate::components::baker::modals::{
 use crate::components::baker::models::{
     ChatHeadStyle, Contact, Message, MessageKind, Operator, UserProfile,
 };
-use crate::components::baker::{capture, download_image, Route};
+use crate::components::baker::Route;
 use dioxus::prelude::*;
 use std::collections::HashMap;
 use std::rc::Rc;

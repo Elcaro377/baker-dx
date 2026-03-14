@@ -428,6 +428,9 @@
   .h-\[88px\] {
     height: 88px;
   }
+  .h-auto {
+    height: auto;
+  }
   .h-full {
     height: 100%;
   }

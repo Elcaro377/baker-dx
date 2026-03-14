@@ -45,18 +45,21 @@ pub(super) fn avif_data_url_from_bytes(bytes: Vec<u8>) -> Option<String> {
     Some(data_url_from_bytes("image/avif", out))
 }
 
-pub(super) async fn capture(selector: &str) -> Option<String> {
-    let selector = selector.to_owned();
-    let eval = document::eval(&format!(
+pub(super) async fn capture(selector: &str, scale: f64) -> Option<String> {
+    let eval = document::eval(
         r#"
-            const el = document.querySelector('{}');
+            const selector = await dioxus.recv();
+            const scaleRaw = Number(await dioxus.recv());
+            const scale = Number.isFinite(scaleRaw) && scaleRaw > 0 ? scaleRaw : 1;
+            const el = document.querySelector(selector);
             if (!el) return null;
-            const result = await snapdom(el);
+            const result = await snapdom(el, { scale });
             const img = await result.toPng();
             return img?.src ?? null;
         "#,
-        selector
-    ));
+    );
+    eval.send(selector.to_owned()).ok()?;
+    eval.send(scale).ok()?;
     let value = eval.await.ok()?;
     value.as_str().map(|src| src.to_string())
 }
