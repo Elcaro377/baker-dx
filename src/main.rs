@@ -71,6 +71,7 @@ fn App() -> Element {
         document::Link { rel: "stylesheet", href: MAIN_CSS }
         document::Link { rel: "stylesheet", href: TAILWIND_CSS }
         document::Link { rel: "stylesheet", href: MODAL_CSS }
+        document::Script { src: "https://unpkg.com/@zumer/snapdom/dist/snapdom.js" }
         document::Style { {font_face} }
         document::Title { "Baker" }
 

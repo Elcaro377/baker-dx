@@ -6,6 +6,7 @@ use crate::components::baker::modals::{
 use crate::components::baker::models::{
     ChatHeadStyle, Contact, Message, MessageKind, Operator, UserProfile,
 };
+use crate::components::baker::Route;
 use dioxus::prelude::*;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -372,9 +373,12 @@ pub fn ChatArea(
         last_sender_id = Some(msg.sender_id.clone());
     }
 
+    let contact_id = use_signal(|| contact.id.clone());
+
     rsx! {
         div {
             class: "flex-1 flex flex-col h-full relative min-h-0",
+            id: "chat_area",
             onclick: move |_| {
                 context_menu.set(None);
                 header_menu_open.set(false);
@@ -535,6 +539,17 @@ pub fn ChatArea(
                                     },
                                     "清除聊天内容和会话"
                                 }
+                                div {
+                                    class: "px-4 py-2 hover:bg-[#3a3a3a] cursor-pointer text-white text-sm transition-colors",
+                                    onclick: move |_| {
+                                        navigator()
+                                            .push(Route::CapturePage {
+                                                contact_id: contact_id(),
+                                            });
+                                        header_menu_open.set(false);
+                                    },
+                                    "导出会话到图片"
+                                }
                                 if is_replaying {
                                     div {
                                         class: "px-4 py-2 hover:bg-[#3a3a3a] cursor-pointer text-white text-sm transition-colors",
@@ -616,6 +631,7 @@ pub fn ChatArea(
                 div {
                     id: "chat-scroll-container",
                     class: "flex-1 overflow-y-auto p-6 mr-3 custom-scrollbar flex flex-col relative z-10",
+                    style: "overflow-x: hidden",
 
                     for row in message_rows {
                         match row {

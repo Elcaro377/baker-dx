@@ -16,7 +16,7 @@ use dioxus::prelude::*;
 /// - max_width: （可选）弹窗中内容的最大宽度。
 ///
 #[component]
-fn Modal(
+pub(crate) fn Modal(
     title: &'static str,
     content_confirmation_button: &'static str,
     children: Element,
