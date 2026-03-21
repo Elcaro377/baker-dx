@@ -27,6 +27,7 @@ image = { version = "0.25.5", default-features = false, features = [
 ] }
 semver = { version = "1.0.27", features = ["serde"] }
 anyhow = "1.0.102"
+indexed_db_futures = "0.6.4"
 
 [features]
 default = ["desktop"]

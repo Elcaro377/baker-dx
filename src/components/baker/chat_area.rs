@@ -3,7 +3,7 @@ use crate::components::baker::modals::{
     EditGroupChatProps, EditMessageModal, InsertMessageModal, OpsSelection, PickSenderModal,
     ReactionModal,
 };
-use crate::components::baker::models::{
+use crate::components::baker::storage::v1::{
     ChatHeadStyle, Contact, Message, MessageKind, Operator, UserProfile,
 };
 use crate::components::baker::Route;

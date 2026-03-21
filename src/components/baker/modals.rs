@@ -1,4 +1,4 @@
-use crate::components::baker::models::Operator;
+use crate::components::baker::storage::v1::Operator;
 use crate::components::baker::{data_url_from_bytes, mime_from_filename};
 use crate::dioxus_elements::FileData;
 use dioxus::prelude::*;
@@ -813,7 +813,7 @@ pub fn EditGroupChatProps(
     on_select: EventHandler<OpsSelection>,
     selected_contact_id: String,
 ) -> Element {
-    let app_state = use_context::<Signal<crate::components::baker::models::AppState>>();
+    let app_state = use_context::<Signal<crate::components::baker::storage::v1::AppState>>();
 
     let app_state_read = app_state.read();
     let operators = app_state_read.operators.clone();

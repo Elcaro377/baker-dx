@@ -6,7 +6,7 @@ use crate::components::baker::{
 
 #[component]
 pub(super) fn CapturePage(contact_id: String) -> Element {
-    let app_state = use_context::<Signal<crate::components::baker::models::AppState>>();
+    let app_state = use_context::<Signal<crate::components::baker::storage::v1::AppState>>();
     let contacts = &app_state.read().contacts;
     let mut img_src = use_signal(String::new);
 

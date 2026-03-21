@@ -1,61 +1,21 @@
-use crate::components::baker::models::{
-    AppState, BackgroundSettings, ChatHeadStyle, Contact, Message, MessageKind, Operator,
-    UserProfile,
-};
-use serde::Deserialize;
 use std::collections::HashMap;
 use uuid::Uuid;
 
 #[cfg(target_arch = "wasm32")]
 use gloo_storage::{LocalStorage, Storage};
 
+use legacy::{LegacyAppState, LegacyMessage};
 #[cfg(not(target_arch = "wasm32"))]
 use std::fs;
+use v1::{AppState, Contact, Message, MessageKind, Operator, UserProfile};
+
+pub(crate) mod legacy;
+pub(crate) mod v1;
+pub(crate) mod v2;
 
 const DEFAULT_STATE_JSON: &str = include_str!("../../../baker_dx_state_default.json");
 
-#[derive(Deserialize)]
-struct LegacyContact {
-    pub id: usize,
-    pub unread_count: usize,
-    #[serde(default)]
-    pub chat_head_style: ChatHeadStyle,
-}
-
-#[derive(Deserialize)]
-struct LegacyMessage {
-    pub id: usize,
-    pub sender_id: usize,
-    pub content: String,
-    pub timestamp: String,
-    #[serde(default)]
-    pub animate: bool,
-}
-
-#[derive(Deserialize)]
-struct LegacyOperator {
-    pub id: usize,
-    pub name: String,
-    pub avatar_url: String,
-}
-
-#[derive(Deserialize)]
-struct LegacyUserProfile {
-    pub name: String,
-    pub avatar_url: String,
-}
-
-#[derive(Deserialize)]
-struct LegacyAppState {
-    pub user_profile: LegacyUserProfile,
-    pub contacts: Vec<LegacyContact>,
-    pub messages: HashMap<usize, Vec<LegacyMessage>>,
-    pub operators: Vec<LegacyOperator>,
-    #[serde(default)]
-    pub background: BackgroundSettings,
-}
-
-fn migrate_legacy_state(legacy: LegacyAppState) -> AppState {
+fn migrate_legacy_state_to_v1(legacy: LegacyAppState) -> AppState {
     let mut id_map: HashMap<usize, String> = HashMap::new();
     let user_id = Uuid::new_v4().to_string();
 
@@ -164,7 +124,7 @@ fn parse_state_from_str(raw: &str) -> Option<AppState> {
         return Some(state);
     }
     if let Ok(legacy) = serde_json::from_str::<LegacyAppState>(raw) {
-        return Some(migrate_legacy_state(legacy));
+        return Some(migrate_legacy_state_to_v1(legacy));
     }
     None
 }
