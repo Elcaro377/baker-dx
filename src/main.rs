@@ -1,7 +1,10 @@
 // The dioxus prelude contains a ton of common items used in dioxus apps. It's a good idea to import wherever you
 // need dioxus
 use dioxus::prelude::*;
+use std::cell::Cell;
+use std::rc::Rc;
 
+use components::baker::storage::v2::AppState;
 use components::baker::storage::{load_state, save_state};
 use components::baker::Route;
 
@@ -46,24 +49,70 @@ fn load_window_icon() -> dioxus::desktop::tao::window::Icon {
 /// Components should be annotated with `#[component]` to support props, better error messages, and autocomplete
 #[component]
 fn App() -> Element {
-    let app_state = use_signal(load_state);
-    use_context_provider(|| app_state);
-    use_effect(move || {
-        if let Err(e) = save_state(&app_state.read()) {
-            #[cfg(target_arch = "wasm32")]
-            {
-                spawn(async move {
-                    let _ =
-                        document::eval(&format!("console.error(\"failed to save state: {}\")", e))
-                            .await;
-                });
-            }
+    let app_state = use_signal(AppState::default);
+    let storage_ready = use_signal(|| false);
+    let load_started = use_hook(|| Rc::new(Cell::new(false)));
+    let save_revision = use_hook(|| Rc::new(Cell::new(0u64)));
+    let skip_initial_save = use_hook(|| Rc::new(Cell::new(false)));
+    let load_started_for_effect = load_started.clone();
+    let save_revision_for_load = save_revision.clone();
+    let skip_initial_save_for_load = skip_initial_save.clone();
+    let save_revision_for_save = save_revision.clone();
+    let skip_initial_save_for_save = skip_initial_save.clone();
 
-            #[cfg(not(target_arch = "wasm32"))]
-            {
-                error!("failed to save state: {}", e);
-            }
+    use_context_provider(|| app_state);
+
+    use_effect(move || {
+        if load_started_for_effect.get() {
+            return;
         }
+        load_started_for_effect.set(true);
+
+        let mut app_state = app_state;
+        let mut storage_ready = storage_ready;
+        let save_revision = save_revision_for_load.clone();
+        let skip_initial_save = skip_initial_save_for_load.clone();
+        spawn(async move {
+            let loaded = load_state().await;
+            save_revision.set(loaded.revision);
+            skip_initial_save.set(loaded.skip_initial_save);
+            app_state.set(loaded.state);
+            storage_ready.set(true);
+        });
+    });
+
+    use_effect(move || {
+        if !storage_ready() {
+            return;
+        }
+        let snapshot = app_state.read().clone();
+        if skip_initial_save_for_save.get() {
+            skip_initial_save_for_save.set(false);
+            return;
+        }
+
+        let next_revision = save_revision_for_save.get().saturating_add(1);
+        save_revision_for_save.set(next_revision);
+
+        spawn(async move {
+            if let Err(e) = save_state(&snapshot, next_revision).await {
+                #[cfg(target_arch = "wasm32")]
+                {
+                    spawn(async move {
+                        let _ = document::eval(&format!(
+                            "console.error(\"failed to save state: {}\")",
+                            e
+                        ))
+                        .await;
+                    });
+                }
+
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    error!("failed to save state: {}", e);
+                }
+            }
+        });
     });
 
     let font_face = format!(
@@ -78,6 +127,22 @@ fn App() -> Element {
     );
 
     // The `rsx!` macro lets us define HTML inside of rust. It expands to an Element with all of our HTML inside.
+    if !storage_ready() {
+        return rsx! {
+            document::Link { rel: "icon", href: FAVICON }
+            document::Link { rel: "stylesheet", href: MAIN_CSS }
+            document::Link { rel: "stylesheet", href: TAILWIND_CSS }
+            document::Link { rel: "stylesheet", href: MODAL_CSS }
+            document::Style { {font_face.clone()} }
+            document::Title { "Baker" }
+
+            div {
+                class: "w-full h-screen flex items-center justify-center bg-[#111] text-white text-sm tracking-wide",
+                "正在加载会话数据…"
+            }
+        };
+    }
+
     rsx! {
         // In addition to element and text (which we will see later), rsx can contain other components. In this case,
         // we are using the `document::Link` component to add a link to our favicon and main CSS file into the head of our app.

@@ -6,7 +6,7 @@ use crate::components::baker::modals::{
 };
 use crate::components::baker::settings::SettingsPage;
 use crate::components::baker::sidebar::Sidebar;
-use crate::components::baker::storage::v1::{
+use crate::components::baker::storage::v2::{
     BackgroundMode, ChatHeadStyle, Contact, Message, MessageKind, MessageReaction,
 };
 use chrono::Utc;
@@ -77,7 +77,7 @@ async fn sleep_ms(ms: u64) {
 }
 
 fn schedule_animate_off_in_state(
-    mut app_state: Signal<crate::components::baker::storage::v1::AppState>,
+    mut app_state: Signal<crate::components::baker::storage::v2::AppState>,
     contact_id: String,
     msg_id: String,
 ) {
@@ -111,7 +111,7 @@ fn schedule_animate_off_in_list(list: Signal<Vec<Message>>, msg_id: String) {
 }
 
 fn schedule_reaction_animate_off_in_state(
-    mut app_state: Signal<crate::components::baker::storage::v1::AppState>,
+    mut app_state: Signal<crate::components::baker::storage::v2::AppState>,
     contact_id: String,
     msg_id: String,
 ) {
@@ -185,7 +185,7 @@ async fn open_url(url: String) {
 
 #[component]
 pub fn BakerLayout() -> Element {
-    let mut app_state = use_context::<Signal<crate::components::baker::storage::v1::AppState>>();
+    let mut app_state = use_context::<Signal<crate::components::baker::storage::v2::AppState>>();
 
     let mut show_new_chat = use_signal(|| false);
     let mut show_profile = use_signal(|| false);
@@ -203,7 +203,7 @@ pub fn BakerLayout() -> Element {
 
     let on_confirm_tip_saving_image_problem_on_web = {
         let mut app_state =
-            use_context::<Signal<crate::components::baker::storage::v1::AppState>>();
+            use_context::<Signal<crate::components::baker::storage::v2::AppState>>();
         move |_| {
             app_state.write().show_tip_saving_image_problem_on_web = true;
         }

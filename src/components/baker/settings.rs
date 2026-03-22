@@ -1,5 +1,5 @@
 use crate::components::baker::layout::load_repo_config;
-use crate::components::baker::storage::v1::{BackgroundMode, Operator};
+use crate::components::baker::storage::v2::{BackgroundMode, Operator};
 use crate::components::baker::{data_url_from_bytes, mime_from_filename, Route};
 use crate::dioxus_elements::FileData;
 use dioxus::prelude::*;
@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 #[component]
 pub fn SettingsPage() -> Element {
-    let mut app_state = use_context::<Signal<crate::components::baker::storage::v1::AppState>>();
+    let mut app_state = use_context::<Signal<crate::components::baker::storage::v2::AppState>>();
 
     let repo_config = load_repo_config().unwrap();
     let repo_url = format!(
