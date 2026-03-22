@@ -19,6 +19,7 @@ const MODAL_CSS: Asset = asset!("/assets/styling/modal.css");
 const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
 
 const FONT: Asset = asset!("/assets/SourceHanSansSC-Regular.otf");
+const FONT_BENDER: Asset = asset!("/assets/bender.otf");
 
 fn main() {
     #[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
@@ -126,6 +127,17 @@ fn App() -> Element {
         FONT.bundled().bundled_path()
     );
 
+    let font_face_bender = format!(
+        r#"
+        @font-face {{
+            font-family: 'Bender';
+            src: url('/assets/{}') format('opentype');
+            font-weight: normal;
+            font-style: normal;
+        }}"#,
+        FONT_BENDER.bundled().bundled_path()
+    );
+
     // The `rsx!` macro lets us define HTML inside of rust. It expands to an Element with all of our HTML inside.
     if !storage_ready() {
         return rsx! {
@@ -134,12 +146,10 @@ fn App() -> Element {
             document::Link { rel: "stylesheet", href: TAILWIND_CSS }
             document::Link { rel: "stylesheet", href: MODAL_CSS }
             document::Style { {font_face.clone()} }
+            document::Style { {font_face_bender.clone()} }
             document::Title { "Baker" }
 
-            div {
-                class: "w-full h-screen flex items-center justify-center bg-[#111] text-white text-sm tracking-wide",
-                "正在加载会话数据…"
-            }
+            LoadingNameCard {}
         };
     }
 
@@ -152,10 +162,43 @@ fn App() -> Element {
         document::Link { rel: "stylesheet", href: MODAL_CSS }
         document::Script { src: "https://unpkg.com/@zumer/snapdom/dist/snapdom.js" }
         document::Style { {font_face} }
+        document::Style { {font_face_bender.clone()} }
         document::Title { "Baker" }
 
         // The router component renders the route enum we defined above. It will handle synchronization of the URL and render
         // the layouts and components for the active route.
         Router::<Route> {}
+    }
+}
+
+#[component]
+fn LoadingNameCard() -> Element {
+    rsx! {
+        div {
+            class: "w-full h-screen flex items-center justify-center bg-black overflow-hidden",
+            style: "font-family: 'Bender'",
+
+            div {
+                class: "overflow-hidden shadow-[0_10px_28px_rgba(0,0,0,0.45)]",
+                style: "width: 320px; background-color: rgb(220, 220, 220);",
+
+                div { class: "flex flex-col",
+
+                    div {
+                        class: "px-3 pt-3",
+                        style: "background-color: rgb(220, 220, 220);",
+
+                        h1 { class: "text-black leading-none text-2xl", "Baker-Dx" }
+                    }
+
+                    div {
+                        class: "w-full px-3",
+                        style: "background-color: rgb(255, 255, 0);",
+
+                        span { class: "block text-black text-sm", "Endfield Industries" }
+                    }
+                }
+            }
+        }
     }
 }
