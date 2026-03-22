@@ -666,10 +666,10 @@ pub fn NewChatModal(
                             .iter()
                             .find(|op| op.id == op_id)
                             .cloned()
-                        {
-                            on_select.call(NewChatSelection::Single(op));
-                            on_close.call(());
-                        }
+                    {
+                        on_select.call(NewChatSelection::Single(op));
+                        on_close.call(());
+                    }
                 } else if selected_count > 1 {
                     let name = group_name().trim().to_string();
                     if name.is_empty() {
@@ -1039,6 +1039,9 @@ pub fn TutorialModal(on_close: EventHandler<()>, on_confirm: EventHandler<bool>)
                                 ul { class: "ml-10", style: "list-style: square inside",
                                     li { "为对方发送：将输入框中的内容以对方的身份发送。" }
                                     li {
+                                        em { "（表情包和图片使用 Ctrl + 左键可以为对方发送）" }
+                                    }
+                                    li {
                                         "发送为状态：将输入框中的内容以状态行的形式发送。"
                                         ul { class: "ml-10", style: "list-style: inside",
                                             li {
@@ -1076,7 +1079,7 @@ pub fn TutorialModal(on_close: EventHandler<()>, on_confirm: EventHandler<bool>)
                             "推荐设置为：\r\n    固定间隔 400ms + 发送后间隔 1000ms，这样子可能大差不差。\r\n    点击开始回放就好了。"
                         }
                         p {
-                            "（回放完之后发送消息（或者历史消息）看不到？切换其他的会话再回来就行了。）"
+                            "（回放完之后发送消息（或者历史消息）看不到？右上角更多按钮的菜单可以结束回放。）"
                         }
                         hr {}
                         p {
