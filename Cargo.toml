@@ -2,9 +2,10 @@
 name = "baker-dx"
 version = "1.2.1"
 authors = ["Wanye_7300 <chensiyuan-2009@outlook.com>"]
-edition = "2021"
+edition = "2024"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[workspace]
+members = ["server"]
 
 [dependencies]
 chrono = { version = "0.4.43", features = ["serde", "wasmbind"] }
