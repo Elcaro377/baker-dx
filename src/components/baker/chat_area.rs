@@ -17,6 +17,11 @@ const CHAT_HEAD_RIGHT: Asset = asset!("/assets/images/chat_head_right.png");
 const CHAT_HEAD_LEFT_2: Asset = asset!("/assets/images/chat_head_left_2.png");
 const CHAT_HEAD_MID_2: Asset = asset!("/assets/images/chat_head_mid_2.png");
 const CHAT_HEAD_RIGHT_2: Asset = asset!("/assets/images/chat_head_right_2.png");
+const AVATAR_FRAME: Asset = asset!("/assets/images/avatarframe.png");
+const MESSAGE_AVATAR_SIZE: i32 = 56;
+const MESSAGE_AVATAR_FRAME_SIZE: i32 = 98;
+const MESSAGE_AVATAR_FRAME_OFFSET: i32 = (MESSAGE_AVATAR_FRAME_SIZE - MESSAGE_AVATAR_SIZE) / 2;
+const MESSAGE_AVATAR_FRAME_VERTICAL_NUDGE: i32 = 3;
 
 fn menu_style(x: i32, y: i32, width: i32, height: i32) -> String {
     format!(
@@ -881,9 +886,9 @@ fn MessageBubble(
     };
 
     let avatar_slot_style = if is_self {
-        "right: 0; top: 0;"
+        format!("right: -{MESSAGE_AVATAR_FRAME_OFFSET}px; top: -{MESSAGE_AVATAR_FRAME_OFFSET}px;")
     } else {
-        "left: 0; top: 0;"
+        format!("left: -{MESSAGE_AVATAR_FRAME_OFFSET}px; top: -{MESSAGE_AVATAR_FRAME_OFFSET}px;")
     };
     let row_align_style = if is_self {
         "justify-content: flex-end;"
@@ -891,9 +896,9 @@ fn MessageBubble(
         "justify-content: flex-start;"
     };
     let bubble_wrap_spacing = if is_self {
-        "margin-right: 68px;"
+        "margin-right: 76px;"
     } else {
-        "margin-left: 68px;"
+        "margin-left: 76px;"
     };
     let bubble_wrap_style = format!("{bubble_anim_style} {bubble_wrap_spacing}");
     let reaction_align_style = if is_self {
@@ -902,13 +907,15 @@ fn MessageBubble(
         "justify-content: flex-start;"
     };
     let name_wrap_style = if is_self {
-        "justify-content: flex-end; padding-right: 68px;"
+        "justify-content: flex-end; padding-right: 76px;"
     } else {
-        "justify-content: flex-start; padding-left: 68px;"
+        "justify-content: flex-start; padding-left: 76px;"
     };
 
     rsx! {
-        div { class: "flex flex-col gap-0 w-full max-w-full", style: "{root_align_style}",
+        div {
+            class: "flex flex-col gap-0 w-full max-w-full",
+            style: "{root_align_style}",
             if show_sender_name {
                 div { class: "w-full flex", style: "{name_wrap_style}",
                     div {
@@ -922,29 +929,14 @@ fn MessageBubble(
                     }
                 }
             }
-            div { class: "relative w-full min-w-0 flex", style: "{row_align_style}",
+            div {
+                class: "relative w-full min-w-0 flex",
+                style: "{row_align_style}",
                 if show_avatar {
-                    div {
-                        class: "w-14 h-14 bg-gray-600 border border-gray-500 shrink-0 flex items-center justify-center text-xs text-gray-300 rounded-full overflow-hidden",
-                        style: "position: absolute; {avatar_slot_style}",
-                        if is_self {
-                            if !user_profile.avatar_url.is_empty() {
-                                img {
-                                    src: "{user_profile.avatar_url}",
-                                    class: "w-full h-full object-cover",
-                                }
-                            } else {
-                                "Me"
-                            }
-                        } else if !sender_avatar.is_empty() {
-                            img {
-                                src: "{sender_avatar}",
-                                class: "w-full h-full object-cover",
-                            }
-                        } else {
-                            span { class: "text-2xl font-bold",
-                                "{sender_name.chars().next().unwrap_or('?')}"
-                            }
+                    div { style: "position: absolute; {avatar_slot_style}",
+                        FramedAvatar {
+                            avatar_url: if is_self { user_profile.avatar_url.clone() } else { sender_avatar.clone() },
+                            fallback_name: if is_self { user_profile.name.clone() } else { sender_name.clone() },
                         }
                     }
                 }
@@ -1017,7 +1009,9 @@ fn MessageBubble(
                                 div { style: "{text_anim_style}", "{message.content}" }
                             }
                             if !reaction_labels.is_empty() {
-                                div { class: "mt-2 flex gap-1 items-center flex-wrap", style: "{reaction_align_style}",
+                                div {
+                                    class: "mt-2 flex gap-1 items-center flex-wrap",
+                                    style: "{reaction_align_style}",
                                     for label in reaction_labels.iter().cloned() {
                                         span {
                                             class: "px-2 py-0.5 text-base rounded-full text-gray-200",
@@ -1029,6 +1023,41 @@ fn MessageBubble(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn FramedAvatar(avatar_url: String, fallback_name: String) -> Element {
+    let fallback_text = fallback_name
+        .chars()
+        .next()
+        .map(|ch| ch.to_string())
+        .unwrap_or_else(|| "?".to_string());
+
+    rsx! {
+        div {
+            class: "relative shrink-0 flex items-center justify-center overflow-visible",
+            style: "width: {MESSAGE_AVATAR_FRAME_SIZE}px; height: {MESSAGE_AVATAR_FRAME_SIZE}px;",
+            img {
+                src: AVATAR_FRAME,
+                class: "absolute inset-0 w-full h-full object-contain pointer-events-none select-none",
+                style: "opacity: 0.9; transform: translateY(-{MESSAGE_AVATAR_FRAME_VERTICAL_NUDGE}px);",
+                alt: "",
+            }
+            div {
+                class: "relative z-[1] bg-gray-600 border border-white/75 shrink-0 flex items-center justify-center text-xs text-gray-300 rounded-full overflow-hidden shadow-sm",
+                style: "width: {MESSAGE_AVATAR_SIZE}px; height: {MESSAGE_AVATAR_SIZE}px;",
+                if !avatar_url.is_empty() {
+                    img {
+                        src: "{avatar_url}",
+                        class: "w-full h-full object-cover",
+                        alt: "{fallback_name}",
+                    }
+                } else {
+                    span { class: "text-2xl font-bold", "{fallback_text}" }
                 }
             }
         }
