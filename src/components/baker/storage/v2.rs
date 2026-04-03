@@ -19,6 +19,8 @@ pub struct Contact {
     #[serde(default)]
     pub participant_ids: Vec<String>,
     #[serde(default)]
+    pub participants_selves_ids: Vec<String>,
+    #[serde(default)]
     pub is_group: bool,
 }
 

@@ -1,9 +1,7 @@
 use anyhow::{Context, anyhow};
-use base64::Engine;
 use dioxus::prelude::*;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use legacy::{LegacyAppState, LegacyMessage};
@@ -26,6 +24,8 @@ const DEFAULT_STATE_JSON: &str = include_str!("../../../baker_dx_state_default.j
 const V1_STORAGE_KEY: &str = "baker_dx_state";
 const V2_META_STORAGE_KEY: &str = "baker_dx_state_v2_meta";
 const V2_DB_NAME: &str = "baker_dx_state_v2";
+const V3_META_STORAGE_KEY: &str = "baker_dx_state_v3_meta";
+const V3_DB_NAME: &str = "baker_dx_state_v3";
 const MESSAGE_STORE_PREFIX: &str = "messages__";
 
 const LOCAL_STORAGE_GET_SCRIPT: &str = r#"
@@ -133,12 +133,95 @@ const LOAD_V2_DB_SCRIPT: &str = r#"
     return JSON.stringify({ contacts, images, messages });
 "#;
 
-const SAVE_V2_DB_SCRIPT: &str = r#"
+const LOAD_V3_DB_SCRIPT: &str = r#"
+    const dbName = await dioxus.recv();
+
+    function openExistingDb(name) {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(name);
+            let settled = false;
+
+            const resolveOnce = (value) => {
+                if (!settled) {
+                    settled = true;
+                    resolve(value);
+                }
+            };
+            const rejectOnce = (error) => {
+                if (!settled) {
+                    settled = true;
+                    reject(error);
+                }
+            };
+
+            request.onupgradeneeded = () => {
+                const db = request.result;
+                if (db) {
+                    db.close();
+                }
+                if (request.transaction) {
+                    request.transaction.abort();
+                }
+                resolveOnce(null);
+            };
+
+            request.onerror = () => {
+                rejectOnce(request.error || new Error("Failed to open IndexedDB"));
+            };
+
+            request.onblocked = () => {
+                rejectOnce(new Error("IndexedDB open blocked"));
+            };
+
+            request.onsuccess = () => {
+                if (settled) {
+                    request.result.close();
+                    return;
+                }
+                resolveOnce(request.result);
+            };
+        });
+    }
+
+    function getStoreValue(db, storeName, key) {
+        return new Promise((resolve, reject) => {
+            if (!db.objectStoreNames.contains(storeName)) {
+                resolve(null);
+                return;
+            }
+
+            const transaction = db.transaction(storeName, "readonly");
+            const request = transaction.objectStore(storeName).get(key);
+
+            request.onsuccess = () => resolve(request.result ?? null);
+            request.onerror = () =>
+                reject(request.error || new Error(`Failed to read ${storeName}`));
+            transaction.onabort = () =>
+                reject(transaction.error || new Error(`Read transaction aborted for ${storeName}`));
+        });
+    }
+
+    const db = await openExistingDb(dbName);
+    if (!db) {
+        return null;
+    }
+
+    const snapshot = await getStoreValue(db, "state", "snapshot");
+    db.close();
+
+    if (!snapshot || typeof snapshot.value !== "string") {
+        return null;
+    }
+
+    return snapshot.value;
+"#;
+
+const SAVE_V3_DB_SCRIPT: &str = r#"
     const dbName = await dioxus.recv();
     const metaKey = await dioxus.recv();
-    const messagePrefix = await dioxus.recv();
-    const payload = JSON.parse(await dioxus.recv());
-    const meta = JSON.parse(payload.meta_json);
+    const metaJson = await dioxus.recv();
+    const snapshotJson = await dioxus.recv();
+    const meta = JSON.parse(metaJson);
 
     function openDb(name, version, onUpgrade) {
         return new Promise((resolve, reject) => {
@@ -158,69 +241,35 @@ const SAVE_V2_DB_SCRIPT: &str = r#"
         });
     }
 
-    function ensureBaseStores(db) {
+    function ensureStores(db) {
         if (!db.objectStoreNames.contains("meta")) {
             db.createObjectStore("meta", { keyPath: "key" });
         }
-        if (!db.objectStoreNames.contains("contacts")) {
-            db.createObjectStore("contacts", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("images")) {
-            const store = db.createObjectStore("images", { keyPath: "id" });
-            store.createIndex("sha256", "sha256", { unique: true });
+        if (!db.objectStoreNames.contains("state")) {
+            db.createObjectStore("state", { keyPath: "key" });
         }
     }
 
-    async function ensureSchema(name, messageStoreNames) {
-        let db = await openDb(name, null, (upgradeDb) => {
-            ensureBaseStores(upgradeDb);
-            for (const storeName of messageStoreNames) {
-                if (!upgradeDb.objectStoreNames.contains(storeName)) {
-                    upgradeDb.createObjectStore(storeName, { keyPath: "order" });
-                }
-            }
-        });
+    let db = await openDb(dbName, null, (upgradeDb) => {
+        ensureStores(upgradeDb);
+    });
 
-        const existingStores = Array.from(db.objectStoreNames);
-        const missingStores = messageStoreNames.filter((storeName) => !existingStores.includes(storeName));
-        const extraStores = existingStores.filter(
-            (storeName) => storeName.startsWith(messagePrefix) && !messageStoreNames.includes(storeName)
-        );
-        const missingBaseStores = ["meta", "contacts", "images"].filter(
-            (storeName) => !existingStores.includes(storeName)
-        );
+    const missingStores = ["meta", "state"].filter(
+        (storeName) => !db.objectStoreNames.contains(storeName)
+    );
 
-        if (missingStores.length === 0 && extraStores.length === 0 && missingBaseStores.length === 0) {
-            return db;
-        }
-
+    if (missingStores.length > 0) {
         const nextVersion = db.version + 1;
         db.close();
-
-        db = await openDb(name, nextVersion, (upgradeDb) => {
-            ensureBaseStores(upgradeDb);
-            for (const storeName of extraStores) {
-                if (upgradeDb.objectStoreNames.contains(storeName)) {
-                    upgradeDb.deleteObjectStore(storeName);
-                }
-            }
-            for (const storeName of messageStoreNames) {
-                if (!upgradeDb.objectStoreNames.contains(storeName)) {
-                    upgradeDb.createObjectStore(storeName, { keyPath: "order" });
-                }
-            }
+        db = await openDb(dbName, nextVersion, (upgradeDb) => {
+            ensureStores(upgradeDb);
         });
-
-        return db;
     }
 
-    const messageStoreNames = payload.contacts.map((contact) => `${messagePrefix}${contact.id}`);
-    const db = await ensureSchema(dbName, messageStoreNames);
-    const transactionStores = ["meta", "contacts", "images", ...messageStoreNames];
-
     const result = await new Promise((resolve, reject) => {
-        const transaction = db.transaction(transactionStores, "readwrite");
+        const transaction = db.transaction(["meta", "state"], "readwrite");
         const metaStore = transaction.objectStore("meta");
+        const stateStore = transaction.objectStore("state");
         let skipped = false;
 
         const revisionRequest = metaStore.get("revision");
@@ -238,31 +287,8 @@ const SAVE_V2_DB_SCRIPT: &str = r#"
                 return;
             }
 
-            transaction.objectStore("contacts").clear();
-            transaction.objectStore("images").clear();
-
-            for (const storeName of messageStoreNames) {
-                transaction.objectStore(storeName).clear();
-            }
-
-            for (const contact of payload.contacts) {
-                transaction.objectStore("contacts").put(contact);
-            }
-
-            for (const image of payload.images) {
-                transaction.objectStore("images").put(image);
-            }
-
-            for (const contact of payload.contacts) {
-                const storeName = `${messagePrefix}${contact.id}`;
-                const store = transaction.objectStore(storeName);
-                const records = payload.messages[contact.id] ?? [];
-                for (const record of records) {
-                    store.put(record);
-                }
-            }
-
             metaStore.put({ key: "revision", value: incomingRevision });
+            stateStore.put({ key: "snapshot", value: snapshotJson });
         };
 
         transaction.oncomplete = () => resolve({ skipped: false });
@@ -279,10 +305,29 @@ const SAVE_V2_DB_SCRIPT: &str = r#"
     db.close();
 
     if (!result.skipped) {
-        window.localStorage.setItem(metaKey, payload.meta_json);
+        window.localStorage.setItem(metaKey, metaJson);
     }
 
     return JSON.stringify(result);
+"#;
+
+const DELETE_V2_STORAGE_SCRIPT: &str = r#"
+    const dbName = await dioxus.recv();
+    const metaKey = await dioxus.recv();
+
+    function deleteDb(name) {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.deleteDatabase(name);
+            request.onsuccess = () => resolve();
+            request.onerror = () =>
+                reject(request.error || new Error("Failed to delete IndexedDB"));
+            request.onblocked = () => reject(new Error("IndexedDB delete blocked"));
+        });
+    }
+
+    window.localStorage.removeItem(metaKey);
+    await deleteDb(dbName);
+    return "ok";
 "#;
 
 pub struct LoadedState {
@@ -380,11 +425,20 @@ struct PersistedDbSnapshot {
 }
 
 #[derive(Clone, Debug, Serialize)]
-struct PersistedSavePayload {
+struct PersistedV3SavePayload {
     meta_json: String,
-    contacts: Vec<PersistedContact>,
-    images: Vec<PersistedImageRecord>,
-    messages: HashMap<String, Vec<PersistedMessage>>,
+    snapshot_json: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct PersistedV3Meta {
+    version: u8,
+    revision: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct PersistedV3Snapshot {
+    state: AppState,
 }
 
 fn migrate_legacy_state_to_v1(legacy: LegacyAppState) -> V1AppState {
@@ -511,6 +565,7 @@ fn migrate_v1_state_to_v2(state: V1AppState) -> AppState {
                 name: contact.name,
                 avatar_url: contact.avatar_url,
                 participant_ids: contact.participant_ids,
+                participants_selves_ids: vec![],
                 is_group: contact.is_group,
             })
             .collect(),
@@ -605,57 +660,6 @@ fn default_loaded_state() -> LoadedState {
     }
 }
 
-fn image_bytes_for_hash(data_url: &str) -> Vec<u8> {
-    if let Some((meta, payload)) = data_url.split_once(',')
-        && meta.contains(";base64")
-        && let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(payload.trim())
-    {
-        return bytes;
-    }
-
-    data_url.as_bytes().to_vec()
-}
-
-fn image_record_from_data_url(data_url: &str) -> PersistedImageRecord {
-    let bytes = image_bytes_for_hash(data_url);
-    let digest = Sha256::digest(bytes);
-    let sha256 = digest
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-
-    let mut id_bytes = [0u8; 16];
-    id_bytes.copy_from_slice(&digest[..16]);
-    id_bytes[6] = (id_bytes[6] & 0x0f) | 0x40;
-    id_bytes[8] = (id_bytes[8] & 0x3f) | 0x80;
-
-    PersistedImageRecord {
-        id: Uuid::from_bytes(id_bytes).to_string(),
-        sha256,
-        data_url: data_url.to_string(),
-    }
-}
-
-fn collect_image_ref(
-    value: &str,
-    images: &mut BTreeMap<String, PersistedImageRecord>,
-) -> Option<StoredImageRef> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-
-    if trimmed.starts_with("data:") {
-        let record = image_record_from_data_url(trimmed);
-        images
-            .entry(record.id.clone())
-            .or_insert_with(|| record.clone());
-        return Some(StoredImageRef::Indexed(record.id));
-    }
-
-    Some(StoredImageRef::Raw(trimmed.to_string()))
-}
-
 fn resolve_image_ref(
     reference: &Option<StoredImageRef>,
     images: &HashMap<String, String>,
@@ -667,115 +671,19 @@ fn resolve_image_ref(
     }
 }
 
-fn encode_state(state: &AppState, revision: u64) -> anyhow::Result<PersistedSavePayload> {
-    let mut images = BTreeMap::<String, PersistedImageRecord>::new();
-
-    let meta = PersistedMeta {
-        version: 2,
+fn encode_v3_state(state: &AppState, revision: u64) -> anyhow::Result<PersistedV3SavePayload> {
+    let meta = PersistedV3Meta {
+        version: 3,
         revision,
-        user_profile: PersistedUserProfile {
-            id: state.user_profile.id.clone(),
-            name: state.user_profile.name.clone(),
-            avatar: collect_image_ref(&state.user_profile.avatar_url, &mut images),
-        },
-        operators: state
-            .operators
-            .iter()
-            .map(|operator| PersistedOperator {
-                id: operator.id.clone(),
-                name: operator.name.clone(),
-                avatar: collect_image_ref(&operator.avatar_url, &mut images),
-            })
-            .collect(),
-        stickers: state
-            .stickers
-            .iter()
-            .filter_map(|sticker| collect_image_ref(sticker, &mut images))
-            .collect(),
-        background: match state.background.mode {
-            BackgroundMode::DotDark => PersistedBackground::DotDark,
-            BackgroundMode::DotLight => PersistedBackground::DotLight,
-            BackgroundMode::CustomColor => {
-                PersistedBackground::CustomColor(state.background.custom_color.clone())
-            }
-            BackgroundMode::CustomImage => PersistedBackground::CustomImage(
-                collect_image_ref(&state.background.custom_image, &mut images)
-                    .unwrap_or_else(|| StoredImageRef::Raw(String::new())),
-            ),
-        },
-        update_snooze_date: state.update_snooze_date.clone(),
-        hide_tutorial: state.hide_tutorial,
-        show_tip_saving_image_problem_on_web: state.show_tip_saving_image_problem_on_web,
+    };
+    let snapshot = PersistedV3Snapshot {
+        state: state.clone(),
     };
 
-    let contacts = state
-        .contacts
-        .iter()
-        .enumerate()
-        .map(|(index, contact)| PersistedContact {
-            id: contact.id.clone(),
-            order: index as u64,
-            unread_count: contact.unread_count,
-            chat_head_style: contact.chat_head_style.clone(),
-            name: contact.name.clone(),
-            avatar: collect_image_ref(&contact.avatar_url, &mut images),
-            participant_ids: contact.participant_ids.clone(),
-            is_group: contact.is_group,
-        })
-        .collect::<Vec<_>>();
-
-    let messages = contacts
-        .iter()
-        .map(|contact| {
-            let persisted_messages = state
-                .messages
-                .get(&contact.id)
-                .cloned()
-                .unwrap_or_default()
-                .into_iter()
-                .enumerate()
-                .map(|(index, message)| {
-                    let kind = match message.kind {
-                        MessageKind::Normal => {
-                            PersistedMessageKind::Normal(message.content.clone())
-                        }
-                        MessageKind::Status => {
-                            PersistedMessageKind::Status(message.content.clone())
-                        }
-                        MessageKind::TopicEnded => {
-                            PersistedMessageKind::TopicEnded(message.content.clone())
-                        }
-                        MessageKind::Image => PersistedMessageKind::Image(
-                            collect_image_ref(&message.content, &mut images).ok_or_else(|| {
-                                anyhow!("missing image content for image message")
-                            })?,
-                        ),
-                        MessageKind::Sticker => PersistedMessageKind::Sticker(
-                            collect_image_ref(&message.content, &mut images).ok_or_else(|| {
-                                anyhow!("missing image content for sticker message")
-                            })?,
-                        ),
-                    };
-
-                    Ok(PersistedMessage {
-                        order: index as u64,
-                        id: message.id,
-                        sender_id: message.sender_id,
-                        kind,
-                        reactions: message.reactions,
-                    })
-                })
-                .collect::<anyhow::Result<Vec<_>>>()?;
-
-            Ok((contact.id.clone(), persisted_messages))
-        })
-        .collect::<anyhow::Result<HashMap<_, _>>>()?;
-
-    Ok(PersistedSavePayload {
-        meta_json: serde_json::to_string(&meta).context("failed to serialize v2 metadata")?,
-        contacts,
-        images: images.into_values().collect(),
-        messages,
+    Ok(PersistedV3SavePayload {
+        meta_json: serde_json::to_string(&meta).context("failed to serialize v3 metadata")?,
+        snapshot_json: serde_json::to_string(&snapshot)
+            .context("failed to serialize v3 snapshot")?,
     })
 }
 
@@ -799,6 +707,7 @@ fn decode_state(meta: PersistedMeta, snapshot: PersistedDbSnapshot) -> Option<Ap
                     name: contact.name,
                     avatar_url: resolve_image_ref(&contact.avatar, &image_map)?,
                     participant_ids: contact.participant_ids,
+                    participants_selves_ids: vec![],
                     is_group: contact.is_group,
                 })
             })
@@ -897,6 +806,10 @@ fn decode_state(meta: PersistedMeta, snapshot: PersistedDbSnapshot) -> Option<Ap
     })
 }
 
+fn decode_v3_state(snapshot: PersistedV3Snapshot) -> AppState {
+    snapshot.state
+}
+
 async fn eval_value(script: &str, inputs: &[String]) -> anyhow::Result<serde_json::Value> {
     let eval = document::eval(script);
     for input in inputs {
@@ -948,6 +861,40 @@ async fn load_v2_snapshot_from_web_storage()
     Ok(Some((meta, snapshot)))
 }
 
+async fn load_v3_snapshot_from_web_storage()
+-> anyhow::Result<Option<(PersistedV3Meta, PersistedV3Snapshot)>> {
+    let Some(meta_raw) = web_storage_get(V3_META_STORAGE_KEY).await? else {
+        return Ok(None);
+    };
+
+    let meta = match serde_json::from_str::<PersistedV3Meta>(&meta_raw) {
+        Ok(meta) if meta.version == 3 => meta,
+        _ => return Ok(None),
+    };
+
+    let snapshot_raw = eval_value(LOAD_V3_DB_SCRIPT, &[V3_DB_NAME.to_string()]).await?;
+
+    let Some(snapshot_json) = snapshot_raw.as_str() else {
+        return Ok(None);
+    };
+
+    let snapshot = match serde_json::from_str::<PersistedV3Snapshot>(snapshot_json) {
+        Ok(snapshot) => snapshot,
+        Err(_) => return Ok(None),
+    };
+
+    Ok(Some((meta, snapshot)))
+}
+
+async fn cleanup_v2_web_storage() -> anyhow::Result<()> {
+    let _ = eval_value(
+        DELETE_V2_STORAGE_SCRIPT,
+        &[V2_DB_NAME.to_string(), V2_META_STORAGE_KEY.to_string()],
+    )
+    .await?;
+    Ok(())
+}
+
 async fn try_load_v1_from_web_storage() -> anyhow::Result<Option<V1AppState>> {
     let Some(raw) = web_storage_get(V1_STORAGE_KEY).await? else {
         return Ok(None);
@@ -977,13 +924,21 @@ fn try_load_legacy_from_desktop_file() -> Option<LegacyAppState> {
 }
 
 pub async fn load_state() -> LoadedState {
+    if let Ok(Some((meta, snapshot))) = load_v3_snapshot_from_web_storage().await {
+        return LoadedState {
+            state: decode_v3_state(snapshot),
+            revision: meta.revision,
+            skip_initial_save: true,
+        };
+    }
+
     if let Ok(Some((meta, snapshot))) = load_v2_snapshot_from_web_storage().await
         && let Some(state) = decode_state(meta.clone(), snapshot)
     {
         return LoadedState {
             state,
             revision: meta.revision,
-            skip_initial_save: true,
+            skip_initial_save: false,
         };
     }
 
@@ -1025,15 +980,14 @@ pub async fn load_state() -> LoadedState {
 }
 
 pub async fn save_state(state: &AppState, revision: u64) -> anyhow::Result<()> {
-    let payload = encode_state(state, revision)?;
-    let payload_json = serde_json::to_string(&payload).context("failed to serialize v2 payload")?;
+    let payload = encode_v3_state(state, revision)?;
     let result_value = eval_value(
-        SAVE_V2_DB_SCRIPT,
+        SAVE_V3_DB_SCRIPT,
         &[
-            V2_DB_NAME.to_string(),
-            V2_META_STORAGE_KEY.to_string(),
-            MESSAGE_STORE_PREFIX.to_string(),
-            payload_json,
+            V3_DB_NAME.to_string(),
+            V3_META_STORAGE_KEY.to_string(),
+            payload.meta_json,
+            payload.snapshot_json,
         ],
     )
     .await?;
@@ -1049,7 +1003,9 @@ pub async fn save_state(state: &AppState, revision: u64) -> anyhow::Result<()> {
 
     let parsed = serde_json::from_str::<SaveResult>(result_json)
         .context("failed to parse IndexedDB save result")?;
-    let _ = parsed.skipped;
+    if !parsed.skipped {
+        let _ = cleanup_v2_web_storage().await;
+    }
 
     Ok(())
 }

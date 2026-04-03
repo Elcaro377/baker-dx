@@ -1,6 +1,5 @@
 use crate::components::baker::capture::CapturePage;
 use crate::components::baker::chat_area::{ChatArea, PendingTyping, ReplayTypingPhase};
-use crate::components::baker::use_synced_field;
 use crate::components::baker::modals::{
     NewChatModal, NewChatSelection, OpsSelection, ProfileModal, ReplayIntervalMode, ReplaySettings,
     ReplaySettingsModal, TutorialModal, UpdateAvailableModal,
@@ -10,6 +9,7 @@ use crate::components::baker::sidebar::Sidebar;
 use crate::components::baker::storage::v2::{
     BackgroundMode, ChatHeadStyle, Contact, Message, MessageKind, MessageReaction,
 };
+use crate::components::baker::use_synced_field;
 use chrono::Utc;
 use dioxus::prelude::*;
 #[cfg(target_arch = "wasm32")]
@@ -363,7 +363,8 @@ pub fn BakerLayout() -> Element {
 
     // Derived signals for Modals
     let operators = use_synced_field(app_state, |s| s.operators.clone(), |s, v| s.operators = v);
-    let _background = use_synced_field(app_state, |s| s.background.clone(), |s, v| s.background = v);
+    let _background =
+        use_synced_field(app_state, |s| s.background.clone(), |s, v| s.background = v);
 
     let add_contact = move |selection: NewChatSelection| {
         let mut state = app_state.write();
@@ -378,6 +379,7 @@ pub fn BakerLayout() -> Element {
                         name: op.name.clone(),
                         avatar_url: op.avatar_url.clone(),
                         participant_ids: vec![op_id.clone()],
+                        participants_selves_ids: vec![],
                         is_group: false,
                     });
                 }
@@ -397,6 +399,7 @@ pub fn BakerLayout() -> Element {
                     name,
                     avatar_url,
                     participant_ids: member_ids,
+                    participants_selves_ids: vec![],
                     is_group: true,
                 });
                 selected_contact_id.set(Some(group_id));
