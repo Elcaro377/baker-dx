@@ -981,6 +981,104 @@ pub fn EditGroupChatProps(
     }
 }
 
+#[component]
+pub fn EditParticipantsSelvesIds(on_close: EventHandler, selected_contact_id: String) -> Element {
+    let app_state = use_context::<Signal<crate::components::baker::storage::v2::AppState>>();
+
+    let app_state_read = app_state.read();
+    let operators = app_state_read.operators.clone();
+    let contact = app_state_read
+        .contacts
+        .iter()
+        .find(|x| x.id == selected_contact_id)
+        .cloned();
+
+    if contact.is_none() {
+        return rsx! {
+            Modal {
+                title: "错误",
+                content_confirmation_button: "确定",
+                on_close,
+                on_confirm: move |_| on_close.call(()),
+
+                {
+                    rsx! { "无法找到名单。是否存在这个群聊？" }
+                }
+            }
+        };
+    }
+
+    let contact = contact.unwrap();
+    let participants = contact.participant_ids;
+    let mut participants_selves_ids = use_signal(|| contact.participants_selves_ids.clone());
+
+    rsx! {
+        Modal {
+            title: "更改participants_selves_ids",
+            content_confirmation_button: "确定",
+            on_close: move |_| on_close.call(()),
+            on_confirm: move |_| {
+                let mut app_state = use_context::<
+                    Signal<crate::components::baker::storage::v2::AppState>,
+                >();
+                let mut app_state_write = app_state.write();
+                app_state_write
+                    .contacts
+                    .iter_mut()
+                    .find(|x| x.id == selected_contact_id)
+                    .unwrap()
+                    .participants_selves_ids = participants_selves_ids();
+                on_close.call(());
+            },
+
+            {
+                rsx! {
+                    div { class: "p-4 max-h-[60vh] overflow-y-auto custom-scrollbar",
+                        div { class: "grid grid-cols-1 gap-2",
+                            for op in operators.iter().filter(|x| participants.contains(&x.id)) {
+                                {
+                                    let op_id = op.id.clone();
+                                    let op_name = op.name.clone();
+                                    let op_avatar = op.avatar_url.clone();
+                                    let op_id_for_click = op_id.clone();
+                                    rsx! {
+                                        div {
+                                            class: "flex items-center gap-3 p-3 rounded hover:bg-black/20 transition-colors text-left group cursor-pointer",
+                                            onclick: move |_| {
+                                                participants_selves_ids
+                                                    .with_mut(|list| {
+                                                        if let Some(pos) = list.iter().position(|id| id == &op_id_for_click) {
+                                                            list.remove(pos);
+                                                        } else {
+                                                            list.push(op_id_for_click.clone());
+                                                        }
+                                                    });
+                                            },
+                                            input {
+                                                r#type: "checkbox",
+                                                class: "w-4 h-4 accent-blue-600 cursor-pointer",
+                                                checked: participants_selves_ids().contains(&op_id),
+                                            }
+                                            div { class: "w-10 h-10 rounded bg-gray-600 flex items-center justify-center overflow-hidden border border-gray-500 group-hover:border-blue-500",
+                                                if !op_avatar.is_empty() {
+                                                    img { src: "{op_avatar}", class: "w-full h-full object-cover" }
+                                                } else {
+                                                    span { class: "text-white font-bold", "{op_name.chars().next().unwrap_or('?')}" }
+                                                }
+                                            }
+                                            span { class: "text-black font-medium", "{op_name}" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 const IMAGE_TUTORIAL_1: Asset = asset!("/tutorial/1.png");
 const IMAGE_TUTORIAL_2: Asset = asset!("/tutorial/2.png");
 const IMAGE_TUTORIAL_3: Asset = asset!("/tutorial/3.png");

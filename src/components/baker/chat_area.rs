@@ -1,8 +1,8 @@
 use crate::components::baker::Route;
 use crate::components::baker::input_bar::InputBar;
 use crate::components::baker::modals::{
-    EditGroupChatProps, EditMessageModal, InsertMessageModal, OpsSelection, PickSenderModal,
-    ReactionModal,
+    EditGroupChatProps, EditMessageModal, EditParticipantsSelvesIds, InsertMessageModal,
+    OpsSelection, PickSenderModal, ReactionModal,
 };
 use crate::components::baker::storage::v2::{
     ChatHeadStyle, Contact, Message, MessageKind, Operator, UserProfile,
@@ -87,6 +87,7 @@ pub fn ChatArea(
     let mut clear_input_token = use_signal(|| 0usize);
     let mut sticker_menu_state = use_signal(|| Option::<(i32, i32)>::None);
     let mut show_set_group_ops_list = use_signal(|| false);
+    let mut show_set_participants_selves_ids = use_signal(|| false);
 
     use_effect(move || {
         menu_close_token.read();
@@ -290,6 +291,7 @@ pub fn ChatArea(
         Message {
             msg: Message,
             is_self: bool,
+            on_right: bool,
             show_avatar: bool,
             item_margin: String,
             msg_id: String,
@@ -301,6 +303,7 @@ pub fn ChatArea(
     }
     let mut message_rows = Vec::new();
     let mut last_sender_id: Option<String> = None;
+    println!("-----");
     for msg in messages_list.iter() {
         if matches!(msg.kind, MessageKind::Status) {
             message_rows.push(ChatRow::Status {
@@ -318,6 +321,9 @@ pub fn ChatArea(
             continue;
         }
         let is_self = msg.sender_id == user_id;
+        let on_right =
+            msg.sender_id == user_id || contact.participants_selves_ids.contains(&msg.sender_id);
+        println!("{}", on_right);
         let show_avatar = if last_sender_id.is_none() {
             if force_first_avatar {
                 true
@@ -367,6 +373,7 @@ pub fn ChatArea(
         message_rows.push(ChatRow::Message {
             msg: msg.clone(),
             is_self,
+            on_right,
             show_avatar,
             item_margin,
             msg_id: msg.id.clone(),
@@ -450,6 +457,12 @@ pub fn ChatArea(
                         on_set_group_ops_list.call(ops_selection);
                         show_set_group_ops_list.set(false);
                     },
+                    selected_contact_id: contact.id.clone(),
+                }
+            }
+            if show_set_participants_selves_ids() {
+                EditParticipantsSelvesIds {
+                    on_close: move |_| show_set_participants_selves_ids.set(false),
                     selected_contact_id: contact.id.clone(),
                 }
             }
@@ -576,6 +589,14 @@ pub fn ChatArea(
                                                 },
                                                 "群组设置……"
                                             }
+                                            div {
+                                                class: "px-4 py-2 hover:bg-[#3a3a3a] cursor-pointer text-white text-sm transition-colors",
+                                                onclick: move |_| {
+                                                    show_set_participants_selves_ids.set(true);
+                                                    header_menu_open.set(false);
+                                                },
+                                                "更改participants_selves_ids……"
+                                            }
                                         }
                                     } else {
                                         rsx! {}
@@ -666,6 +687,7 @@ pub fn ChatArea(
                             ChatRow::Message {
                                 msg,
                                 is_self,
+                                on_right,
                                 show_avatar,
                                 item_margin,
                                 msg_id,
@@ -680,6 +702,7 @@ pub fn ChatArea(
                                         MessageBubble {
                                             message: msg,
                                             is_self,
+                                            on_right,
                                             show_avatar,
                                             show_sender_name: contact.is_group && show_avatar,
                                             sender_name,
@@ -800,6 +823,7 @@ fn ReplayFinishedLine(content: String, animate: bool) -> Element {
 fn MessageBubble(
     message: Message,
     is_self: bool,
+    on_right: bool,
     show_avatar: bool,
     show_sender_name: bool,
     sender_name: String,
@@ -809,18 +833,18 @@ fn MessageBubble(
     user_profile: Rc<UserProfile>,
     on_context_menu: EventHandler<MouseEvent>,
 ) -> Element {
-    let root_align_style = if is_self {
+    let root_align_style = if on_right {
         "align-items: flex-end;"
     } else {
         "align-items: flex-start;"
     };
-    let anim_origin = if is_self {
+    let anim_origin = if on_right {
         "transform-origin: calc(100% + 8px) 0;"
     } else {
         "transform-origin: -8px 0;"
     };
 
-    let (bg_color, text_color, show_grid) = if is_self {
+    let (bg_color, text_color, show_grid) = if on_right {
         ("rgb(243, 242, 242)", "text-black", true)
     } else {
         ("rgb(69, 69, 69)", "text-white", false)
@@ -856,7 +880,7 @@ fn MessageBubble(
     };
     let typing_bubble_class = "relative px-3 py-2 text-base font-medium shadow-sm leading-relaxed text-left min-h-[42px] flex items-center";
 
-    let bubble_radius_class = if is_self {
+    let bubble_radius_class = if on_right {
         "rounded-2xl rounded-tr-none"
     } else {
         "rounded-2xl rounded-tl-none"
@@ -876,7 +900,7 @@ fn MessageBubble(
             pending_phase,
             Some(ReplayTypingPhase::Reveal) | Some(ReplayTypingPhase::Typing)
         ) {
-        if is_self {
+        if on_right {
             "opacity: 0; animation: textFadeIn 0.2s ease-out 0.15s forwards;"
         } else {
             "opacity: 0; animation: textFadeIn 0.1s ease-out 0.12s forwards;"
@@ -885,28 +909,28 @@ fn MessageBubble(
         "opacity: 1;"
     };
 
-    let avatar_slot_style = if is_self {
+    let avatar_slot_style = if on_right {
         format!("right: -{MESSAGE_AVATAR_FRAME_OFFSET}px; top: -{MESSAGE_AVATAR_FRAME_OFFSET}px;")
     } else {
         format!("left: -{MESSAGE_AVATAR_FRAME_OFFSET}px; top: -{MESSAGE_AVATAR_FRAME_OFFSET}px;")
     };
-    let row_align_style = if is_self {
+    let row_align_style = if on_right {
         "justify-content: flex-end;"
     } else {
         "justify-content: flex-start;"
     };
-    let bubble_wrap_spacing = if is_self {
+    let bubble_wrap_spacing = if on_right {
         "margin-right: 76px;"
     } else {
         "margin-left: 76px;"
     };
     let bubble_wrap_style = format!("{bubble_anim_style} {bubble_wrap_spacing}");
-    let reaction_align_style = if is_self {
+    let reaction_align_style = if on_right {
         "justify-content: flex-end;"
     } else {
         "justify-content: flex-start;"
     };
-    let name_wrap_style = if is_self {
+    let name_wrap_style = if on_right {
         "justify-content: flex-end; padding-right: 76px;"
     } else {
         "justify-content: flex-start; padding-left: 76px;"
@@ -949,7 +973,7 @@ fn MessageBubble(
                         on_context_menu.call(evt);
                     },
                     if !is_image {
-                        if !is_self {
+                        if !on_right {
                             div { class: "absolute top-0 -left-[8px] w-[9px] h-[20px] overflow-hidden",
                                 svg {
                                     view_box: "0 0 9 20",
