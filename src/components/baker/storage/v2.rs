@@ -150,4 +150,7 @@ pub struct AppState {
     pub hide_tutorial: bool,
     #[serde(default)]
     pub show_tip_saving_image_problem_on_web: bool,
+    /// 暂缓开发的提醒
+    #[serde(default)]
+    pub showed_notice: bool,
 }

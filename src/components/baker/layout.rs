@@ -1,8 +1,8 @@
 use crate::components::baker::capture::CapturePage;
 use crate::components::baker::chat_area::{ChatArea, PendingTyping, ReplayTypingPhase};
 use crate::components::baker::modals::{
-    NewChatModal, NewChatSelection, OpsSelection, ProfileModal, ReplayIntervalMode, ReplaySettings,
-    ReplaySettingsModal, TutorialModal, UpdateAvailableModal,
+    NewChatModal, NewChatSelection, Notice, OpsSelection, ProfileModal, ReplayIntervalMode,
+    ReplaySettings, ReplaySettingsModal, TutorialModal, UpdateAvailableModal,
 };
 use crate::components::baker::settings::SettingsPage;
 use crate::components::baker::sidebar::Sidebar;
@@ -201,6 +201,7 @@ pub fn BakerLayout() -> Element {
     let mut replay_pending = use_signal(|| Option::<PendingTyping>::None);
     let mut update_info = use_signal(|| Option::<UpdateInfo>::None);
     let mut update_checked = use_signal(|| false);
+    let mut show_notice = use_signal(|| !app_state.read().showed_notice);
 
     let navigator = use_navigator();
 
@@ -868,6 +869,14 @@ pub fn BakerLayout() -> Element {
                         spawn(async move {
                             open_url(url).await;
                         });
+                    },
+                }
+            }
+            if show_notice() {
+                Notice {
+                    on_close: move |_| {
+                        show_notice.set(false);
+                        app_state.write().showed_notice = true;
                     },
                 }
             }

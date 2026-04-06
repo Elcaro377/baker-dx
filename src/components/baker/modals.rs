@@ -1079,6 +1079,36 @@ pub fn EditParticipantsSelvesIds(on_close: EventHandler, selected_contact_id: St
     }
 }
 
+#[component]
+pub fn Notice(on_close: EventHandler) -> Element {
+    rsx! {
+        Modal {
+            title: "Baker-Dx 将暂缓开发一会儿 & 将迁移到 Tauri",
+            content_confirmation_button: "— 我明白了",
+            on_close: move |_| on_close.call(()),
+            on_confirm: move |_| on_close.call(()),
+
+            {
+                rsx! {
+                    p { class: "m-b-[5px] text-black",
+                        "其实这个项目在开始的时候只是我因为想要学习前端开发而写的，随着内容越来越多，我实在离不开 AI 帮我写一些功能了；另外，代码越来越繁杂，界面一层 div 套一层，快到了必须重构的地步了。"
+                    }
+
+                    p { class: "m-b-[5px] text-black",
+                        "正好，借着这个时间迁移到 Tauri，能有更成熟的 GUI 库用。"
+                    }
+
+                    p { class: "m-b-[5px] text-black",
+                        "计划如下：主分支继续写一些小更新，比如国际化，还有样式还原等；feature-tauri 则待我基本学完前端的知识后，开始写。"
+                    }
+
+                    p { class: "m-b-[5px] text-black", "感谢你使用这个软件！" }
+                }
+            }
+        }
+    }
+}
+
 const IMAGE_TUTORIAL_1: Asset = asset!("/tutorial/1.png");
 const IMAGE_TUTORIAL_2: Asset = asset!("/tutorial/2.png");
 const IMAGE_TUTORIAL_3: Asset = asset!("/tutorial/3.png");

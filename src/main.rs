@@ -2,6 +2,8 @@
 // need dioxus
 use dioxus::prelude::*;
 use std::cell::Cell;
+#[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use components::baker::Route;
@@ -25,7 +27,11 @@ fn main() {
     #[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
     {
         let icon = load_window_icon();
-        let cfg = dioxus::desktop::Config::new().with_icon(icon);
+        let data_dir = desktop_data_dir();
+        let _ = std::fs::create_dir_all(&data_dir);
+        let cfg = dioxus::desktop::Config::new()
+            .with_icon(icon)
+            .with_data_directory(data_dir);
         dioxus::LaunchBuilder::desktop().with_cfg(cfg).launch(App);
     }
 
@@ -42,6 +48,47 @@ fn load_window_icon() -> dioxus::desktop::tao::window::Icon {
     let (width, height) = image.dimensions();
     let rgba = image.into_raw();
     dioxus::desktop::tao::window::Icon::from_rgba(rgba, width, height).expect("icon rgba failed")
+}
+
+#[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
+fn desktop_data_dir() -> PathBuf {
+    const APP_DIR_NAME: &str = "baker-dx";
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(base_dir) =
+            std::env::var_os("LOCALAPPDATA").or_else(|| std::env::var_os("APPDATA"))
+        {
+            return PathBuf::from(base_dir).join(APP_DIR_NAME);
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(home_dir) = std::env::var_os("HOME") {
+            return PathBuf::from(home_dir)
+                .join("Library")
+                .join("Application Support")
+                .join(APP_DIR_NAME);
+        }
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        if let Some(data_home) = std::env::var_os("XDG_DATA_HOME") {
+            return PathBuf::from(data_home).join(APP_DIR_NAME);
+        }
+        if let Some(home_dir) = std::env::var_os("HOME") {
+            return PathBuf::from(home_dir)
+                .join(".local")
+                .join("share")
+                .join(APP_DIR_NAME);
+        }
+    }
+
+    std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join(APP_DIR_NAME)
 }
 
 /// App is the main component of our app. Components are the building blocks of dioxus apps. Each component is a function

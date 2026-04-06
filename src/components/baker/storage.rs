@@ -415,6 +415,7 @@ struct PersistedMeta {
     update_snooze_date: Option<String>,
     hide_tutorial: bool,
     show_tip_saving_image_problem_on_web: bool,
+    show_notice: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -626,6 +627,7 @@ fn migrate_v1_state_to_v2(state: V1AppState) -> AppState {
         update_snooze_date: state.update_snooze_date,
         hide_tutorial: state.hide_tutorial,
         show_tip_saving_image_problem_on_web: state.show_tip_saving_image_problem_on_web,
+        showed_notice: false,
     }
 }
 
@@ -803,6 +805,7 @@ fn decode_state(meta: PersistedMeta, snapshot: PersistedDbSnapshot) -> Option<Ap
         update_snooze_date: meta.update_snooze_date,
         hide_tutorial: meta.hide_tutorial,
         show_tip_saving_image_problem_on_web: meta.show_tip_saving_image_problem_on_web,
+        showed_notice: meta.show_notice,
     })
 }
 
