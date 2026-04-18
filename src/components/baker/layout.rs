@@ -1,8 +1,9 @@
 use crate::components::baker::capture::CapturePage;
 use crate::components::baker::chat_area::{ChatArea, PendingTyping, ReplayTypingPhase};
 use crate::components::baker::modals::{
-    NewChatModal, NewChatSelection, Notice, OpsSelection, ProfileModal, ReplayIntervalMode,
-    ReplaySettings, ReplaySettingsModal, TutorialModal, UpdateAvailableModal,
+    EmojiSupportModal, NewChatModal, NewChatSelection, Notice, OpsSelection, ProfileModal,
+    ReplayIntervalMode, ReplaySettings, ReplaySettingsModal, TutorialModal,
+    UpdateAvailableModal,
 };
 use crate::components::baker::settings::SettingsPage;
 use crate::components::baker::sidebar::Sidebar;
@@ -191,6 +192,8 @@ pub fn BakerLayout() -> Element {
     let mut show_new_chat = use_signal(|| false);
     let mut show_profile = use_signal(|| false);
     let mut show_tutorial = use_signal(|| false);
+    let mut show_emoji_help =
+        use_signal(|| app_state.read().showed_notice && !app_state.read().showed_emoji_help);
 
     let mut selected_contact_id = use_signal(|| Option::<String>::None);
     let mut menu_close_token = use_signal(|| 0usize);
@@ -842,6 +845,14 @@ pub fn BakerLayout() -> Element {
                     },
                 }
             }
+            if show_emoji_help() {
+                EmojiSupportModal {
+                    on_close: move |_| {
+                        show_emoji_help.set(false);
+                        app_state.write().showed_emoji_help = true;
+                    },
+                }
+            }
 
             if replay_request_msg_id().is_some() {
                 ReplaySettingsModal {
@@ -875,8 +886,12 @@ pub fn BakerLayout() -> Element {
             if show_notice() {
                 Notice {
                     on_close: move |_| {
+                        let should_show_emoji_help = !app_state.read().showed_emoji_help;
                         show_notice.set(false);
                         app_state.write().showed_notice = true;
+                        if should_show_emoji_help {
+                            show_emoji_help.set(true);
+                        }
                     },
                 }
             }

@@ -1,4 +1,5 @@
 use crate::components::baker::Route;
+use crate::components::assets::emojis::to_emoji;
 use crate::components::baker::input_bar::InputBar;
 use crate::components::baker::modals::{
     EditGroupChatProps, EditMessageModal, EditParticipantsSelvesIds, InsertMessageModal,
@@ -27,6 +28,67 @@ fn menu_style(x: i32, y: i32, width: i32, height: i32) -> String {
     format!(
         "left: clamp(8px, {x}px, calc(100vw - {width}px - 8px)); top: clamp(8px, {y}px, calc(100vh - {height}px - 8px));"
     )
+}
+
+const INLINE_EMOJI_STYLE: &str =
+    "display: inline-block; width: 1.6em; height: 1.6em; vertical-align: -0.4em; object-fit: contain;";
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum InlineEmojiSegment {
+    Text(String),
+    Emoji(String),
+}
+
+fn parse_inline_emoji_segments(content: &str) -> Vec<InlineEmojiSegment> {
+    if content.is_empty() {
+        return Vec::new();
+    }
+
+    let mut segments = Vec::new();
+    let mut cursor = 0usize;
+    let mut text_start = 0usize;
+
+    while let Some(start_rel) = content[cursor..].find(':') {
+        let start = cursor + start_rel;
+        let candidate_start = start + 1;
+
+        let Some(end_rel) = content[candidate_start..].find(':') else {
+            break;
+        };
+        let end = candidate_start + end_rel;
+        let candidate = &content[candidate_start..end];
+
+        if is_inline_emoji_candidate(candidate) && to_emoji(candidate).is_some() {
+            if text_start < start {
+                segments.push(InlineEmojiSegment::Text(
+                    content[text_start..start].to_string(),
+                ));
+            }
+            segments.push(InlineEmojiSegment::Emoji(candidate.to_string()));
+            cursor = end + 1;
+            text_start = cursor;
+        } else {
+            cursor = candidate_start;
+        }
+    }
+
+    if text_start < content.len() {
+        segments.push(InlineEmojiSegment::Text(content[text_start..].to_string()));
+    }
+
+    if segments.is_empty() {
+        vec![InlineEmojiSegment::Text(content.to_string())]
+    } else {
+        segments
+    }
+}
+
+fn is_inline_emoji_candidate(candidate: &str) -> bool {
+    !candidate.is_empty()
+        && !candidate.chars().all(|ch| ch.is_ascii_digit())
+        && candidate
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '+'))
 }
 
 #[derive(Clone, PartialEq)]
@@ -820,6 +882,40 @@ fn ReplayFinishedLine(content: String, animate: bool) -> Element {
 }
 
 #[component]
+fn InlineEmojiText(content: String, style: String) -> Element {
+    let segments = parse_inline_emoji_segments(&content);
+
+    rsx! {
+        div { style: "{style}",
+            for (index , segment) in segments.into_iter().enumerate() {
+                match segment {
+                    InlineEmojiSegment::Text(text) => rsx! {
+                        span { key: "text-{index}", "{text}" }
+                    },
+                    InlineEmojiSegment::Emoji(key) => {
+                        let alt = format!(":{key}:");
+                        match to_emoji(&key) {
+                            Some(asset) => rsx! {
+                                img {
+                                    key: "emoji-{index}",
+                                    src: asset,
+                                    alt: "{alt}",
+                                    class: "select-none pointer-events-none",
+                                    style: INLINE_EMOJI_STYLE,
+                                }
+                            },
+                            None => rsx! {
+                                span { key: "emoji-fallback-{index}", "{alt}" }
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[component]
 fn MessageBubble(
     message: Message,
     is_self: bool,
@@ -1030,7 +1126,10 @@ fn MessageBubble(
                                     style: "{text_anim_style}",
                                 }
                             } else {
-                                div { style: "{text_anim_style}", "{message.content}" }
+                                InlineEmojiText {
+                                    content: message.content.clone(),
+                                    style: text_anim_style.to_string(),
+                                }
                             }
                             if !reaction_labels.is_empty() {
                                 div {
@@ -1050,6 +1149,39 @@ fn MessageBubble(
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{InlineEmojiSegment, parse_inline_emoji_segments};
+
+    #[test]
+    fn parses_named_inline_emojis() {
+        assert_eq!(
+            parse_inline_emoji_segments("你好 :happy: Baker"),
+            vec![
+                InlineEmojiSegment::Text("你好 ".to_string()),
+                InlineEmojiSegment::Emoji("happy".to_string()),
+                InlineEmojiSegment::Text(" Baker".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn keeps_unknown_tokens_as_plain_text() {
+        assert_eq!(
+            parse_inline_emoji_segments("测试 :unknown: 内容"),
+            vec![InlineEmojiSegment::Text("测试 :unknown: 内容".to_string())]
+        );
+    }
+
+    #[test]
+    fn does_not_parse_plain_numeric_time_segments() {
+        assert_eq!(
+            parse_inline_emoji_segments("12:30:45"),
+            vec![InlineEmojiSegment::Text("12:30:45".to_string())]
+        );
     }
 }
 

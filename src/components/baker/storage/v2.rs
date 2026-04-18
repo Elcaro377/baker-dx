@@ -153,4 +153,6 @@ pub struct AppState {
     /// 暂缓开发的提醒
     #[serde(default)]
     pub showed_notice: bool,
+    #[serde(default)]
+    pub showed_emoji_help: bool,
 }

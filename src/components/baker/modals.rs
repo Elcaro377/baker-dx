@@ -1,3 +1,4 @@
+use crate::components::assets::emojis::{EMOJI_KEYS, to_emoji};
 use crate::components::baker::storage::v2::Operator;
 use crate::components::baker::{data_url_from_bytes, mime_from_filename};
 use crate::dioxus_elements::FileData;
@@ -1103,6 +1104,57 @@ pub fn Notice(on_close: EventHandler) -> Element {
                     }
 
                     p { class: "m-b-[5px] text-black", "感谢你使用这个软件！" }
+                }
+            }
+        }
+    }
+}
+
+#[component]
+pub fn EmojiSupportModal(on_close: EventHandler<()>) -> Element {
+    rsx! {
+        Modal {
+            title: "已支持 Emoji 语法",
+            content_confirmation_button: "知道了",
+            on_close: move |_| on_close.call(()),
+            on_confirm: move |_| on_close.call(()),
+            max_width: 960,
+
+            {
+                rsx! {
+                    div { class: "p-4 max-h-[60vh] overflow-y-auto custom-scrollbar text-black text-base leading-relaxed space-y-4",
+                        h1 { class: "text-2xl font-bold", "聊天正文现在支持内联 emoji 图片" }
+                        p {
+                            "你可以直接在消息里输入 "
+                            span { class: "px-1 py-0.5 rounded bg-black/10 font-mono text-sm", ":happy:" }
+                            "、"
+                            span { class: "px-1 py-0.5 rounded bg-black/10 font-mono text-sm", ":thumb:" }
+                            " 这样的语法。"
+                        }
+                        p { "显示时会自动替换成 emoji。" }
+                        div { class: "rounded border border-black/10 bg-black/5 px-3 py-2 text-sm",
+                            span { class: "font-semibold", "示例：" }
+                            span { class: "font-mono", "今天很开心 :happy: 然后给你一个 :thumb:" }
+                        }
+                        div { class: "grid grid-cols-2 md:grid-cols-3 gap-3",
+                            for key in EMOJI_KEYS {
+                                if let Some(asset) = to_emoji(key) {
+                                    div {
+                                        key: "{key}",
+                                        class: "flex items-center gap-3 rounded border border-black/10 bg-white/50 px-3 py-2",
+                                        img {
+                                            src: asset,
+                                            alt: ":{key}:",
+                                            class: "w-6 h-6 shrink-0 object-contain",
+                                        }
+                                        div { class: "min-w-0",
+                                            div { class: "font-mono text-sm break-all", ":{key}:" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

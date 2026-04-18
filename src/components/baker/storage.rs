@@ -416,6 +416,8 @@ struct PersistedMeta {
     hide_tutorial: bool,
     show_tip_saving_image_problem_on_web: bool,
     show_notice: bool,
+    #[serde(default)]
+    showed_emoji_help: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -628,6 +630,7 @@ fn migrate_v1_state_to_v2(state: V1AppState) -> AppState {
         hide_tutorial: state.hide_tutorial,
         show_tip_saving_image_problem_on_web: state.show_tip_saving_image_problem_on_web,
         showed_notice: false,
+        showed_emoji_help: false,
     }
 }
 
@@ -806,6 +809,7 @@ fn decode_state(meta: PersistedMeta, snapshot: PersistedDbSnapshot) -> Option<Ap
         hide_tutorial: meta.hide_tutorial,
         show_tip_saving_image_problem_on_web: meta.show_tip_saving_image_problem_on_web,
         showed_notice: meta.show_notice,
+        showed_emoji_help: meta.showed_emoji_help,
     })
 }
 
