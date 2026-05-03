@@ -132,11 +132,7 @@ fn normalize_emoji_key(text: &str) -> Option<String> {
         return None;
     }
 
-    Some(
-        trimmed
-            .to_ascii_lowercase()
-            .replace(['-', ' '], "_"),
-    )
+    Some(trimmed.to_ascii_lowercase().replace(['-', ' '], "_"))
 }
 
 fn emoji_from_resource_key(text: &str) -> Option<Asset> {

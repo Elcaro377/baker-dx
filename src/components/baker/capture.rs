@@ -12,12 +12,7 @@ pub(super) fn CapturePage(contact_id: String) -> Element {
 
     let navigator = navigator();
 
-    let contact = use_signal(|| {
-        contacts
-            .iter()
-            .find(|x| x.id == contact_id)
-            .cloned()
-    });
+    let contact = use_signal(|| contacts.iter().find(|x| x.id == contact_id).cloned());
 
     let operators = use_signal(move || app_state.read().operators.clone());
     let messages = use_memo(move || {

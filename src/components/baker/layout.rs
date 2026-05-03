@@ -2,8 +2,7 @@ use crate::components::baker::capture::CapturePage;
 use crate::components::baker::chat_area::{ChatArea, PendingTyping, ReplayTypingPhase};
 use crate::components::baker::modals::{
     EmojiSupportModal, NewChatModal, NewChatSelection, Notice, OpsSelection, ProfileModal,
-    ReplayIntervalMode, ReplaySettings, ReplaySettingsModal, TutorialModal,
-    UpdateAvailableModal,
+    ReplayIntervalMode, ReplaySettings, ReplaySettingsModal, TutorialModal, UpdateAvailableModal,
 };
 use crate::components::baker::settings::SettingsPage;
 use crate::components::baker::sidebar::Sidebar;

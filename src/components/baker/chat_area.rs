@@ -1,5 +1,5 @@
-use crate::components::baker::Route;
 use crate::components::assets::emojis::to_emoji;
+use crate::components::baker::Route;
 use crate::components::baker::input_bar::InputBar;
 use crate::components::baker::modals::{
     EditGroupChatProps, EditMessageModal, EditParticipantsSelvesIds, InsertMessageModal,
@@ -30,8 +30,7 @@ fn menu_style(x: i32, y: i32, width: i32, height: i32) -> String {
     )
 }
 
-const INLINE_EMOJI_STYLE: &str =
-    "display: inline-block; width: 1.6em; height: 1.6em; vertical-align: -0.4em; object-fit: contain;";
+const INLINE_EMOJI_STYLE: &str = "display: inline-block; width: 1.6em; height: 1.6em; vertical-align: -0.4em; object-fit: contain;";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum InlineEmojiSegment {
@@ -365,7 +364,7 @@ pub fn ChatArea(
     }
     let mut message_rows = Vec::new();
     let mut last_sender_id: Option<String> = None;
-    println!("-----");
+
     for msg in messages_list.iter() {
         if matches!(msg.kind, MessageKind::Status) {
             message_rows.push(ChatRow::Status {
@@ -385,7 +384,7 @@ pub fn ChatArea(
         let is_self = msg.sender_id == user_id;
         let on_right =
             msg.sender_id == user_id || contact.participants_selves_ids.contains(&msg.sender_id);
-        println!("{}", on_right);
+
         let show_avatar = if last_sender_id.is_none() {
             if force_first_avatar {
                 true

@@ -1,11 +1,71 @@
+use crate::components::assets::emojis::{EMOJI_KEYS, to_emoji};
 use crate::components::baker::{data_url_from_bytes, mime_from_filename};
 use crate::dioxus_elements::FileData;
 use dioxus::prelude::*;
+
+const EMOJI_COMPLETION_MAX_HEIGHT_PX: usize = 256;
+
+#[derive(Clone, PartialEq, Debug)]
+struct EmojiCompletion {
+    start: usize,
+    query: String,
+    keys: Vec<&'static str>,
+}
 
 fn menu_style(x: i32, y: i32, width: i32, height: i32) -> String {
     format!(
         "left: clamp(8px, {x}px, calc(100vw - {width}px - 8px)); top: clamp(8px, {y}px, calc(100vh - {height}px - 8px));"
     )
+}
+
+fn emoji_completion_for(text: &str) -> Option<EmojiCompletion> {
+    let start = text.rfind(':')?;
+    let query = &text[start + 1..];
+
+    if query.is_empty()
+        && start > 0
+        && text[..start]
+            .chars()
+            .next_back()
+            .is_some_and(|ch| !ch.is_whitespace())
+    {
+        return None;
+    }
+
+    if query.contains(':')
+        || query
+            .chars()
+            .any(|ch| !(ch.is_ascii_alphanumeric() || ch == '_' || ch == '-'))
+    {
+        return None;
+    }
+
+    let normalized_query = query.to_ascii_lowercase().replace('-', "_");
+    let keys = EMOJI_KEYS
+        .iter()
+        .copied()
+        .filter(|key| key.starts_with(&normalized_query))
+        .collect::<Vec<_>>();
+
+    if keys.is_empty() {
+        return None;
+    }
+
+    Some(EmojiCompletion {
+        start,
+        query: query.to_string(),
+        keys,
+    })
+}
+
+fn complete_emoji_text(text: &str, completion: &EmojiCompletion, key: &str) -> String {
+    let mut next = String::with_capacity(text.len() + key.len() + 2);
+    next.push_str(&text[..completion.start]);
+    next.push(':');
+    next.push_str(key);
+    next.push(':');
+    next.push_str(&text[completion.start + completion.query.len() + 1..]);
+    next
 }
 
 const CHAT_ENTER: Asset = asset!("/assets/images/chat_enter.png");
@@ -34,6 +94,8 @@ pub fn InputBar(
     let mut image_input_token = use_signal(|| 0usize);
     let mut image_send_other = use_signal(|| false);
     let mut sticker_input_token = use_signal(|| 0usize);
+    let mut active_emoji_completion = use_signal(|| 0usize);
+    let mut dismissed_emoji_completion = use_signal(|| Option::<usize>::None);
 
     let mut handle_submit = move || {
         let val = text.read().clone();
@@ -41,6 +103,8 @@ pub fn InputBar(
             on_send.call(val);
             need_to_scroll_down.set(true);
             text.set(String::new());
+            active_emoji_completion.set(0);
+            dismissed_emoji_completion.set(None);
         }
     };
     let mut handle_submit_other = move || {
@@ -49,6 +113,8 @@ pub fn InputBar(
             on_send_other.call(val);
             need_to_scroll_down.set(true);
             text.set(String::new());
+            active_emoji_completion.set(0);
+            dismissed_emoji_completion.set(None);
         }
     };
     let mut handle_submit_status = move || {
@@ -57,7 +123,15 @@ pub fn InputBar(
             on_send_status.call(val);
             need_to_scroll_down.set(true);
             text.set(String::new());
+            active_emoji_completion.set(0);
+            dismissed_emoji_completion.set(None);
         }
+    };
+    let mut apply_emoji_completion = move |completion: EmojiCompletion, key: &'static str| {
+        let current = text.read().clone();
+        text.set(complete_emoji_text(&current, &completion, key));
+        active_emoji_completion.set(0);
+        dismissed_emoji_completion.set(None);
     };
     use_effect(move || {
         menu_close_token.read();
@@ -68,6 +142,34 @@ pub fn InputBar(
     use_effect(move || {
         clear_text_token.read();
         text.set(String::new());
+        active_emoji_completion.set(0);
+        dismissed_emoji_completion.set(None);
+    });
+    use_effect(move || {
+        let Some(completion) = emoji_completion_for(&text()) else {
+            return;
+        };
+        if dismissed_emoji_completion() == Some(completion.start) {
+            return;
+        }
+
+        let active_index = active_emoji_completion().min(completion.keys.len() - 1);
+        spawn(async move {
+            let script = format!(
+                r#"
+                requestAnimationFrame(() => {{
+                    const item = document.getElementById("emoji-completion-option-{active_index}");
+                    if (!item) return;
+                    item.scrollIntoView({{
+                        block: "nearest",
+                        inline: "nearest",
+                        behavior: "instant"
+                    }});
+                }});
+                "#
+            );
+            let _ = document::eval(&script).await;
+        });
     });
 
     rsx! {
@@ -227,14 +329,99 @@ pub fn InputBar(
 
             // 左侧输入条
             div {
-                class: "flex-1 h-10 rounded-full flex items-center px-4 shadow-sm",
+                class: "relative flex-1 h-10 rounded-full flex items-center px-4 shadow-sm",
                 style: "background-color: rgb(240, 238, 238);",
+                onclick: |e| e.stop_propagation(),
+                {
+                    let completion = emoji_completion_for(&text());
+                    if let Some(completion) = completion {
+                        if dismissed_emoji_completion() == Some(completion.start) {
+                            rsx! {}
+                        } else {
+                            let active_index = active_emoji_completion().min(completion.keys.len() - 1);
+                            rsx! {
+                                div {
+                                    class: "absolute left-4 bottom-12 z-[90] w-56 overflow-y-auto rounded-md border border-gray-300 bg-white shadow-xl",
+                                    style: "max-height: {EMOJI_COMPLETION_MAX_HEIGHT_PX}px;",
+                                    onclick: |e| e.stop_propagation(),
+                                    for (index, key) in completion.keys.iter().enumerate() {
+                                        {
+                                            let key = *key;
+                                            let emoji_asset = to_emoji(key);
+                                            let item_completion = completion.clone();
+                                            let is_active = index == active_index;
+                                            rsx! {
+                                                button {
+                                                    key: "{key}",
+                                                    id: "emoji-completion-option-{index}",
+                                                    class: if is_active {
+                                                        "flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-black bg-[#e8edf5]"
+                                                    } else {
+                                                        "flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-black hover:bg-[#f1f3f6]"
+                                                    },
+                                                    onclick: move |_| apply_emoji_completion(item_completion.clone(), key),
+                                                    if let Some(asset) = emoji_asset {
+                                                        img {
+                                                            src: "{asset}",
+                                                            class: "h-6 w-6 shrink-0 object-contain",
+                                                            alt: ":{key}:",
+                                                        }
+                                                    }
+                                                    span { class: "min-w-0 flex-1 truncate font-mono", ":{key}:" }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        rsx! {}
+                    }
+                }
                 input {
                     class: "flex-1 bg-transparent border-none outline-none text-black font-medium text-sm placeholder-gray-500",
                     placeholder: "发消息",
                     value: "{text}",
-                    oninput: move |evt| text.set(evt.value()),
+                    oninput: move |evt| {
+                        text.set(evt.value());
+                        active_emoji_completion.set(0);
+                        dismissed_emoji_completion.set(None);
+                    },
                     onkeydown: move |evt| {
+                        if let Some(completion) = emoji_completion_for(&text()) {
+                            if dismissed_emoji_completion() != Some(completion.start) {
+                                let key_count = completion.keys.len();
+                                match evt.key() {
+                                    Key::ArrowDown => {
+                                        evt.prevent_default();
+                                        active_emoji_completion.set((active_emoji_completion() + 1) % key_count);
+                                        return;
+                                    }
+                                    Key::ArrowUp => {
+                                        evt.prevent_default();
+                                        active_emoji_completion
+                                            .set((active_emoji_completion() + key_count - 1) % key_count);
+                                        return;
+                                    }
+                                    Key::Enter | Key::Tab => {
+                                        evt.prevent_default();
+                                        let active_index = active_emoji_completion().min(key_count - 1);
+                                        if let Some(key) = completion.keys.get(active_index).copied() {
+                                            apply_emoji_completion(completion, key);
+                                        }
+                                        return;
+                                    }
+                                    Key::Escape => {
+                                        evt.prevent_default();
+                                        active_emoji_completion.set(0);
+                                        dismissed_emoji_completion.set(Some(completion.start));
+                                        return;
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
                         if evt.key() == Key::Enter {
                             handle_submit();
                         }
@@ -301,5 +488,37 @@ pub fn InputBar(
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{complete_emoji_text, emoji_completion_for};
+
+    #[test]
+    fn emoji_completion_opens_after_colon() {
+        let completion = emoji_completion_for("hello :").unwrap();
+        assert_eq!(completion.start, 6);
+        assert!(completion.keys.contains(&"happy"));
+    }
+
+    #[test]
+    fn emoji_completion_filters_by_prefix() {
+        let completion = emoji_completion_for(":hun").unwrap();
+        assert_eq!(completion.keys, vec!["hundred"]);
+    }
+
+    #[test]
+    fn emoji_completion_replaces_current_token() {
+        let completion = emoji_completion_for("hello :hun").unwrap();
+        assert_eq!(
+            complete_emoji_text("hello :hun", &completion, "hundred"),
+            "hello :hundred:"
+        );
+    }
+
+    #[test]
+    fn emoji_completion_ignores_closed_tokens() {
+        assert!(emoji_completion_for("hello :happy:").is_none());
     }
 }
