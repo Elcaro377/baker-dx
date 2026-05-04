@@ -916,12 +916,6 @@ pub fn BakerLayout() -> Element {
                             "点击这里看教程！！"
                         }
                     }
-                    button {
-                        onclick: move |_| {
-                            let _ = crate::add_toast_notification_title();
-                        },
-                        "test"
-                    }
                 }
 
                 // Profile Button
