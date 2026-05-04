@@ -1,8 +1,10 @@
 use crate::components::assets::emojis::{EMOJI_KEYS, to_emoji};
+use crate::components::baker::locale::use_locale_refresh;
 use crate::components::baker::storage::v2::Operator;
 use crate::components::baker::{data_url_from_bytes, mime_from_filename};
 use crate::dioxus_elements::FileData;
 use dioxus::prelude::*;
+use rust_i18n::t;
 
 ///
 /// 弹窗的模板。
@@ -18,13 +20,15 @@ use dioxus::prelude::*;
 ///
 #[component]
 pub(crate) fn Modal(
-    title: &'static str,
-    content_confirmation_button: &'static str,
+    title: String,
+    content_confirmation_button: String,
     children: Element,
     on_close: EventHandler,
     on_confirm: EventHandler,
     max_width: Option<u32>,
 ) -> Element {
+    let _current_locale = use_locale_refresh();
+    let cancel_label = t!("common.cancel").to_string();
     let content_style = if let Some(mw) = max_width {
         format!("w-full max-w-[{}px] mx-auto", mw)
     } else {
@@ -48,7 +52,7 @@ pub(crate) fn Modal(
 
                         div { class: "px-5 py-3 flex justify-between items-center bg-[#fdfc00] border-b border-black/10",
                             h2 { class: "text-black text-xl font-semibold tracking-wide",
-                                {title}
+                                "{title}"
                             }
                             button {
                                 class: "w-7 h-7 rounded flex items-center justify-center text-black hover:bg-black/10 transition-colors cursor-pointer",
@@ -66,14 +70,14 @@ pub(crate) fn Modal(
                                     button {
                                         class: "px-4 py-2 text-black hover:text-gray-400 text-sm cursor-pointer",
                                         onclick: move |_| on_close.call(()),
-                                        "取消"
+                                        "{cancel_label}"
                                     }
                                     button {
                                         class: "px-4 py-2 bg-[#fdfc00] hover:bg-[#fdfc00]/60 text-black rounded text-sm font-medium cursor-pointer",
                                         onclick: move |_| {
                                             on_confirm.call(());
                                         },
-                                        {content_confirmation_button}
+                                        "{content_confirmation_button}"
                                     }
                                 }
                             }
@@ -123,6 +127,7 @@ pub fn ReplaySettingsModal(
     on_close: EventHandler<()>,
     on_start: EventHandler<ReplaySettings>,
 ) -> Element {
+    let _current_locale = use_locale_refresh();
     let mut mode = use_signal(|| ReplayIntervalMode::Fixed);
     let mut fixed_ms = use_signal(|| "800".to_string());
     let mut per_char_ms = use_signal(|| "40".to_string());
@@ -138,11 +143,16 @@ pub fn ReplaySettingsModal(
     } else {
         "bg-[#fdfc00]/0 text-black"
     };
+    let fixed_interval_label = t!("modals.replay.fixed_interval").to_string();
+    let per_char_label = t!("modals.replay.per_char").to_string();
+    let fixed_ms_label = t!("modals.replay.fixed_ms").to_string();
+    let per_char_ms_label = t!("modals.replay.per_char_ms").to_string();
+    let gap_ms_label = t!("modals.replay.gap_ms").to_string();
 
     rsx! {
         Modal {
-            title: "回放设置",
-            content_confirmation_button: "开始回放",
+            title: t!("modals.replay.title").to_string(),
+            content_confirmation_button: t!("modals.replay.start").to_string(),
             on_confirm: move |_| {
                 let fixed = fixed_ms().parse::<u64>().unwrap_or(800);
                 let per_char = per_char_ms().parse::<u64>().unwrap_or(40);
@@ -164,17 +174,17 @@ pub fn ReplaySettingsModal(
                         button {
                             class: "flex-1 px-3 py-2 rounded text-sm font-medium transition-colors {fixed_class}",
                             onclick: move |_| mode.set(ReplayIntervalMode::Fixed),
-                            "固定间隔"
+                            "{fixed_interval_label}"
                         }
                         button {
                             class: "flex-1 px-3 py-2 rounded text-sm font-medium transition-colors {per_char_class}",
                             onclick: move |_| mode.set(ReplayIntervalMode::PerChar),
-                            "按字数"
+                            "{per_char_label}"
                         }
                     }
                     div { class: "space-y-3",
                         div { class: "space-y-1",
-                            label { class: "block text-black text-sm", "固定间隔 (ms)" }
+                            label { class: "block text-black text-sm", "{fixed_ms_label}" }
                             input {
                                 class: "w-full bg-[#e9e9e9] border border-black/10 rounded p-3 text-black text-sm focus:outline-none focus:border-black/30 resize-none",
                                 r#type: "number",
@@ -184,7 +194,7 @@ pub fn ReplaySettingsModal(
                             }
                         }
                         div { class: "space-y-1",
-                            label { class: "block text-black text-sm", "每字时间 (ms)" }
+                            label { class: "block text-black text-sm", "{per_char_ms_label}" }
                             input {
                                 class: "w-full bg-[#e9e9e9] border border-black/10 rounded p-3 text-black text-sm focus:outline-none focus:border-black/30 resize-none",
                                 r#type: "number",
@@ -194,7 +204,7 @@ pub fn ReplaySettingsModal(
                             }
                         }
                         div { class: "space-y-1",
-                            label { class: "block text-black text-sm", "发送后间隔 (ms)" }
+                            label { class: "block text-black text-sm", "{gap_ms_label}" }
                             input {
                                 class: "w-full bg-[#e9e9e9] border border-black/10 rounded p-3 text-black text-sm focus:outline-none focus:border-black/30 resize-none",
                                 r#type: "number",
@@ -222,8 +232,14 @@ pub fn ProfileModal(
     on_close: EventHandler<()>,
     on_save: EventHandler<(String, String)>,
 ) -> Element {
+    let _current_locale = use_locale_refresh();
     let mut name = use_signal(|| current_name);
     let avatar_preview = use_signal(|| current_avatar);
+    let title_label = t!("modals.profile.title").to_string();
+    let name_label = t!("modals.profile.name").to_string();
+    let avatar_file_label = t!("modals.profile.avatar_file").to_string();
+    let cancel_label = t!("common.cancel").to_string();
+    let save_label = t!("common.save").to_string();
 
     rsx! {
         div {
@@ -234,7 +250,7 @@ pub fn ProfileModal(
                 onclick: |e| e.stop_propagation(),
 
                 div { class: "px-6 py-4 border-b border-gray-600 flex justify-between items-center bg-[#333]",
-                    h2 { class: "text-white text-lg font-bold", "个人资料设置" }
+                    h2 { class: "text-white text-lg font-bold", "{title_label}" }
                     button {
                         class: "text-gray-400 hover:text-white transition-colors",
                         onclick: move |_| on_close.call(()),
@@ -245,7 +261,7 @@ pub fn ProfileModal(
                 div { class: "p-6",
                     div { class: "space-y-4",
                         div {
-                            label { class: "block text-gray-400 text-sm mb-1", "昵称" }
+                            label { class: "block text-gray-400 text-sm mb-1", "{name_label}" }
                             input {
                                 class: "w-full bg-[#222] border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500",
                                 value: "{name}",
@@ -253,7 +269,7 @@ pub fn ProfileModal(
                             }
                         }
                         div {
-                            label { class: "block text-gray-400 text-sm mb-1", "头像文件" }
+                            label { class: "block text-gray-400 text-sm mb-1", "{avatar_file_label}" }
                             input {
                                 class: "w-full bg-[#222] border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500",
                                 r#type: "file",
@@ -299,12 +315,12 @@ pub fn ProfileModal(
                         button {
                             class: "px-4 py-2 text-gray-400 hover:text-white text-sm",
                             onclick: move |_| on_close.call(()),
-                            "取消"
+                            "{cancel_label}"
                         }
                         button {
                             class: "px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm font-medium",
                             onclick: move |_| { on_save.call((name(), avatar_preview())) },
-                            "保存"
+                            "{save_label}"
                         }
                     }
                 }
@@ -326,12 +342,13 @@ pub fn EditMessageModal(
     on_close: EventHandler<()>,
     on_save: EventHandler<String>,
 ) -> Element {
+    let _current_locale = use_locale_refresh();
     let mut content = use_signal(|| initial_content);
 
     rsx! {
         Modal {
-            title: "编辑消息",
-            content_confirmation_button: "保存",
+            title: t!("modals.edit_message.title").to_string(),
+            content_confirmation_button: t!("common.save").to_string(),
             on_close,
             on_confirm: move |_| {
                 on_save.call(content());
@@ -355,12 +372,14 @@ pub fn EditMessageModal(
 ///
 #[component]
 pub fn ReactionModal(on_close: EventHandler<()>, on_save: EventHandler<String>) -> Element {
+    let _current_locale = use_locale_refresh();
     let mut reaction = use_signal(|| "".to_string());
+    let placeholder_label = t!("modals.reaction.placeholder").to_string();
 
     rsx! {
         Modal {
-            title: "添加反应",
-            content_confirmation_button: "添加",
+            title: t!("modals.reaction.title").to_string(),
+            content_confirmation_button: t!("modals.reaction.add").to_string(),
             on_close,
             on_confirm: move |_| {
                 let val = reaction();
@@ -373,7 +392,7 @@ pub fn ReactionModal(on_close: EventHandler<()>, on_save: EventHandler<String>) 
                 rsx! {
                     input {
                         class: "w-full bg-[#e9e9e9] border border-black/10 rounded p-3 text-black text-sm focus:outline-none focus:border-black/30 resize-none",
-                        placeholder: "输入 reaction（例如 😀）",
+                        placeholder: "{placeholder_label}",
                         value: "{reaction}",
                         oninput: move |e| reaction.set(e.value()),
                         onkeydown: move |e| {
@@ -427,11 +446,14 @@ pub fn UpdateAvailableModal(
     on_close: EventHandler<()>,
     on_skip_today: EventHandler<()>,
 ) -> Element {
+    let _current_locale = use_locale_refresh();
     let release_url = use_hook(|| release_url);
+    let latest_version_label = t!("modals.update.latest_version").to_string();
+    let skip_today_label = t!("modals.update.skip_today").to_string();
     rsx! {
         Modal {
-            title: "发现新版本",
-            content_confirmation_button: "现在更新",
+            title: t!("modals.update.title").to_string(),
+            content_confirmation_button: t!("modals.update.now").to_string(),
             on_close,
             on_confirm: move |_| {
                 on_update_now.call(release_url.clone());
@@ -441,7 +463,7 @@ pub fn UpdateAvailableModal(
             {
                 rsx! {
                     div { class: "mb-4 text-black",
-                        "最新版本："
+                        "{latest_version_label}"
                         span { class: "font-semibold", "{latest_version}" }
                     }
                     a {
@@ -450,7 +472,7 @@ pub fn UpdateAvailableModal(
                             on_skip_today.call(());
                             on_close.call(());
                         },
-                        "今日内不再提醒"
+                        "{skip_today_label}"
                     }
                 }
             }
@@ -471,11 +493,13 @@ pub fn PickSenderModal(
     on_close: EventHandler<()>,
     on_send: EventHandler<String>,
 ) -> Element {
+    let _current_locale = use_locale_refresh();
     let mut selected_id = use_signal(|| Option::<String>::None);
+    let no_members_label = t!("modals.pick_sender.no_members").to_string();
     rsx! {
         Modal {
-            title: "选择发送对象",
-            content_confirmation_button: "确定",
+            title: t!("modals.pick_sender.title").to_string(),
+            content_confirmation_button: t!("common.confirm").to_string(),
             on_close,
             on_confirm: move |_| {
                 if let Some(id) = selected_id() {
@@ -485,7 +509,7 @@ pub fn PickSenderModal(
             },
             div { class: "max-h-[50vh] overflow-y-auto custom-scrollbar",
                 if members.is_empty() {
-                    div { class: "text-center text-black/60 py-6", "暂无可选成员" }
+                    div { class: "text-center text-black/60 py-6", "{no_members_label}" }
                 } else {
                     div { class: "grid grid-cols-1 gap-2",
                         for member in members {
@@ -532,6 +556,7 @@ pub fn InsertMessageModal(
     on_close: EventHandler<()>,
     on_save: EventHandler<(String, Option<String>)>,
 ) -> Element {
+    let _current_locale = use_locale_refresh();
     let mut content = use_signal(String::new);
     let mut is_self = use_signal(|| true);
     // 群组模式下，选"对方"后弹出成员选择
@@ -549,6 +574,9 @@ pub fn InsertMessageModal(
     } else {
         "bg-[#fdfc00]/0 text-black"
     };
+    let self_label = t!("modals.insert.self").to_string();
+    let other_label = t!("modals.insert.other").to_string();
+    let placeholder_label = t!("modals.insert.placeholder").to_string();
     let on_close_safe = {
         let on_close = on_close;
         let pick_sender = pick_sender;
@@ -577,8 +605,8 @@ pub fn InsertMessageModal(
 
     rsx! {
         Modal {
-            title: "在此前插入消息",
-            content_confirmation_button: "插入",
+            title: t!("modals.insert.title").to_string(),
+            content_confirmation_button: t!("modals.insert.confirm").to_string(),
             on_close: on_close_safe,
             on_confirm: move |_| {
                 let val = content();
@@ -598,17 +626,17 @@ pub fn InsertMessageModal(
                     button {
                         class: "flex-1 px-3 py-2 rounded text-sm font-medium transition-colors cursor-pointer {self_class}",
                         onclick: move |_| is_self.set(true),
-                        "我方"
+                        "{self_label}"
                     }
                     button {
                         class: "flex-1 px-3 py-2 rounded text-sm font-medium transition-colors cursor-pointer {other_class}",
                         onclick: move |_| is_self.set(false),
-                        "对方"
+                        "{other_label}"
                     }
                 }
                 textarea {
                     class: "w-full h-32 bg-[#e9e9e9] border border-black/10 rounded p-3 text-black text-sm focus:outline-none focus:border-black/30 resize-none",
-                    placeholder: "输入想要插入的消息……",
+                    placeholder: "{placeholder_label}",
                     value: "{content}",
                     oninput: move |e| content.set(e.value()),
                 }
@@ -648,16 +676,19 @@ pub fn NewChatModal(
     on_close: EventHandler<()>,
     on_select: EventHandler<NewChatSelection>,
 ) -> Element {
+    let _current_locale = use_locale_refresh();
     let mut selected_ids = use_signal(Vec::<String>::new);
     let mut group_name = use_signal(|| "".to_string());
     let group_avatar = use_signal(|| "".to_string());
     let mut error_text = use_signal(|| "".to_string());
     let selected_count = selected_ids().len();
+    let no_operators_label = t!("modals.new_chat.no_operators").to_string();
+    let group_name_placeholder = t!("modals.new_chat.group_name_placeholder").to_string();
 
     rsx! {
         Modal {
-            title: "发起新会话",
-            content_confirmation_button: "发起",
+            title: t!("modals.new_chat.title").to_string(),
+            content_confirmation_button: t!("modals.new_chat.start").to_string(),
             on_close,
             on_confirm: move |_| {
                 if selected_count == 1 {
@@ -674,7 +705,7 @@ pub fn NewChatModal(
                 } else if selected_count > 1 {
                     let name = group_name().trim().to_string();
                     if name.is_empty() {
-                        error_text.set("请输入群组名称".to_string());
+                        error_text.set(t!("modals.new_chat.group_name_required").to_string());
                         return;
                     }
                     on_select
@@ -692,7 +723,7 @@ pub fn NewChatModal(
                     div { class: "p-4 max-h-[60vh] overflow-y-auto custom-scrollbar",
                         if operators.read().is_empty() {
                             div { class: "text-center text-gray-500 py-8",
-                                "暂无干员数据，请先双击标题栏进行设置"
+                                "{no_operators_label}"
                             }
                         } else {
                             div { class: "grid grid-cols-1 gap-2",
@@ -742,7 +773,7 @@ pub fn NewChatModal(
                                 div { class: "space-y-3",
                                     input {
                                         class: "w-full bg-[#e9e9e9] border border-black/10 rounded p-3 text-black text-sm focus:outline-none focus:border-black/30 resize-none",
-                                        placeholder: "群组名称",
+                                        placeholder: "{group_name_placeholder}",
                                         value: "{group_name}",
                                         oninput: move |e| {
                                             group_name.set(e.value());
@@ -813,6 +844,7 @@ pub fn EditGroupChatProps(
     on_select: EventHandler<OpsSelection>,
     selected_contact_id: String,
 ) -> Element {
+    let _current_locale = use_locale_refresh();
     let app_state = use_context::<Signal<crate::components::baker::storage::v2::AppState>>();
 
     let app_state_read = app_state.read();
@@ -822,17 +854,18 @@ pub fn EditGroupChatProps(
         .iter()
         .find(|x| x.id == selected_contact_id)
         .cloned();
+    let missing_roster_label = t!("modals.group.missing_roster").to_string();
 
     if contact.is_none() {
         return rsx! {
             Modal {
-                title: "错误",
-                content_confirmation_button: "确定",
+                title: t!("common.error").to_string(),
+                content_confirmation_button: t!("common.confirm").to_string(),
                 on_close,
                 on_confirm: move |_| on_close.call(()),
 
                 {
-                    rsx! { "无法找到名单。是否存在这个群聊？" }
+                    rsx! { "{missing_roster_label}" }
                 }
             }
         };
@@ -844,16 +877,21 @@ pub fn EditGroupChatProps(
     let mut group_avatar = use_signal(|| contact.avatar_url.clone());
     let mut avatar_file_input_key = use_signal(|| 0usize);
     let mut error_text = use_signal(|| "".to_string());
+    let group_name_label = t!("modals.group.name").to_string();
+    let group_name_placeholder = t!("modals.group.name_placeholder").to_string();
+    let group_avatar_label = t!("modals.group.avatar").to_string();
+    let clear_avatar_label = t!("modals.group.clear_avatar").to_string();
+    let members_title_label = t!("modals.group.members_title").to_string();
 
     rsx! {
         Modal {
-            title: "群组设置",
-            content_confirmation_button: "好",
+            title: t!("modals.group.settings_title").to_string(),
+            content_confirmation_button: t!("common.ok").to_string(),
             on_close,
             on_confirm: move |_| {
                 let name = group_name().trim().to_string();
                 if name.is_empty() {
-                    error_text.set("请输入群组名称".to_string());
+                    error_text.set(t!("modals.group.name_placeholder").to_string());
                     return;
                 }
                 on_select
@@ -868,10 +906,10 @@ pub fn EditGroupChatProps(
                 rsx! {
                     div { class: "space-y-4",
                         div {
-                            label { class: "block text-black text-sm mb-1", "群组名称" }
+                            label { class: "block text-black text-sm mb-1", "{group_name_label}" }
                             input {
                                 class: "w-full bg-[#e9e9e9] border border-black/10 rounded p-3 text-black text-sm focus:outline-none focus:border-black/30 resize-none",
-                                placeholder: "请输入群组名称",
+                                placeholder: "{group_name_placeholder}",
                                 value: "{group_name}",
                                 oninput: move |e| {
                                     group_name.set(e.value());
@@ -880,7 +918,7 @@ pub fn EditGroupChatProps(
                             }
                         }
                         div {
-                            label { class: "block text-black text-sm mb-1", "群组头像" }
+                            label { class: "block text-black text-sm mb-1", "{group_avatar_label}" }
                             div { class: "flex items-center gap-3",
                                 div { class: "w-14 h-14 rounded bg-gray-600 flex items-center justify-center overflow-hidden border border-gray-500 shrink-0",
                                     if !group_avatar().is_empty() {
@@ -924,7 +962,7 @@ pub fn EditGroupChatProps(
                                             group_avatar.set("".to_string());
                                             avatar_file_input_key.set(avatar_file_input_key() + 1);
                                         },
-                                        "清空已选头像"
+                                        "{clear_avatar_label}"
                                     }
                                 }
                             }
@@ -934,7 +972,7 @@ pub fn EditGroupChatProps(
                         }
                     }
 
-                    h2 { class: "text-2xl font-bold text-black", "群组人员设置" }
+                    h2 { class: "text-2xl font-bold text-black", "{members_title_label}" }
 
                     div { class: "p-4 max-h-[60vh] overflow-y-auto custom-scrollbar",
                         div { class: "grid grid-cols-1 gap-2",
@@ -984,6 +1022,7 @@ pub fn EditGroupChatProps(
 
 #[component]
 pub fn EditParticipantsSelvesIds(on_close: EventHandler, selected_contact_id: String) -> Element {
+    let _current_locale = use_locale_refresh();
     let app_state = use_context::<Signal<crate::components::baker::storage::v2::AppState>>();
 
     let app_state_read = app_state.read();
@@ -993,17 +1032,18 @@ pub fn EditParticipantsSelvesIds(on_close: EventHandler, selected_contact_id: St
         .iter()
         .find(|x| x.id == selected_contact_id)
         .cloned();
+    let missing_roster_label = t!("modals.group.missing_roster").to_string();
 
     if contact.is_none() {
         return rsx! {
             Modal {
-                title: "错误",
-                content_confirmation_button: "确定",
+                title: t!("common.error").to_string(),
+                content_confirmation_button: t!("common.confirm").to_string(),
                 on_close,
                 on_confirm: move |_| on_close.call(()),
 
                 {
-                    rsx! { "无法找到名单。是否存在这个群聊？" }
+                    rsx! { "{missing_roster_label}" }
                 }
             }
         };
@@ -1015,8 +1055,8 @@ pub fn EditParticipantsSelvesIds(on_close: EventHandler, selected_contact_id: St
 
     rsx! {
         Modal {
-            title: "更改participants_selves_ids",
-            content_confirmation_button: "确定",
+            title: t!("modals.participants.title").to_string(),
+            content_confirmation_button: t!("common.confirm").to_string(),
             on_close: move |_| on_close.call(()),
             on_confirm: move |_| {
                 let mut app_state = use_context::<
@@ -1082,28 +1122,28 @@ pub fn EditParticipantsSelvesIds(on_close: EventHandler, selected_contact_id: St
 
 #[component]
 pub fn Notice(on_close: EventHandler) -> Element {
+    let _current_locale = use_locale_refresh();
+    let notice_p1 = t!("modals.notice.p1").to_string();
+    let notice_p2 = t!("modals.notice.p2").to_string();
+    let notice_p3 = t!("modals.notice.p3").to_string();
+    let notice_thanks = t!("modals.notice.thanks").to_string();
+
     rsx! {
         Modal {
-            title: "Baker-Dx 将暂缓开发一会儿 & 将迁移到 Tauri",
-            content_confirmation_button: "— 我明白了",
+            title: t!("modals.notice.title").to_string(),
+            content_confirmation_button: t!("modals.notice.confirm").to_string(),
             on_close: move |_| on_close.call(()),
             on_confirm: move |_| on_close.call(()),
 
             {
                 rsx! {
-                    p { class: "m-b-[5px] text-black",
-                        "其实这个项目在开始的时候只是我因为想要学习前端开发而写的，随着内容越来越多，我实在离不开 AI 帮我写一些功能了；另外，代码越来越繁杂，界面一层 div 套一层，快到了必须重构的地步了。"
-                    }
+                    p { class: "m-b-[5px] text-black", "{notice_p1}" }
 
-                    p { class: "m-b-[5px] text-black",
-                        "正好，借着这个时间迁移到 Tauri，能有更成熟的 GUI 库用。"
-                    }
+                    p { class: "m-b-[5px] text-black", "{notice_p2}" }
 
-                    p { class: "m-b-[5px] text-black",
-                        "计划如下：主分支继续写一些小更新，比如国际化，还有样式还原等；feature-tauri 则待我基本学完前端的知识后，开始写。"
-                    }
+                    p { class: "m-b-[5px] text-black", "{notice_p3}" }
 
-                    p { class: "m-b-[5px] text-black", "感谢你使用这个软件！" }
+                    p { class: "m-b-[5px] text-black", "{notice_thanks}" }
                 }
             }
         }
@@ -1112,10 +1152,19 @@ pub fn Notice(on_close: EventHandler) -> Element {
 
 #[component]
 pub fn EmojiSupportModal(on_close: EventHandler<()>) -> Element {
+    let _current_locale = use_locale_refresh();
+    let heading_label = t!("modals.emoji.heading").to_string();
+    let syntax_prefix_label = t!("modals.emoji.syntax_prefix").to_string();
+    let syntax_separator_label = t!("modals.emoji.syntax_separator").to_string();
+    let syntax_suffix_label = t!("modals.emoji.syntax_suffix").to_string();
+    let display_label = t!("modals.emoji.display").to_string();
+    let example_label = t!("modals.emoji.example_label").to_string();
+    let example_text = t!("modals.emoji.example_text").to_string();
+
     rsx! {
         Modal {
-            title: "已支持 Emoji 语法",
-            content_confirmation_button: "知道了",
+            title: t!("modals.emoji.title").to_string(),
+            content_confirmation_button: t!("modals.emoji.confirm").to_string(),
             on_close: move |_| on_close.call(()),
             on_confirm: move |_| on_close.call(()),
             max_width: 960,
@@ -1123,18 +1172,18 @@ pub fn EmojiSupportModal(on_close: EventHandler<()>) -> Element {
             {
                 rsx! {
                     div { class: "p-4 max-h-[60vh] overflow-y-auto custom-scrollbar text-black text-base leading-relaxed space-y-4",
-                        h1 { class: "text-2xl font-bold", "聊天正文现在支持内联 emoji 图片" }
+                        h1 { class: "text-2xl font-bold", "{heading_label}" }
                         p {
-                            "你可以直接在消息里输入 "
+                            "{syntax_prefix_label}"
                             span { class: "px-1 py-0.5 rounded bg-black/10 font-mono text-sm", ":happy:" }
-                            "、"
+                            "{syntax_separator_label}"
                             span { class: "px-1 py-0.5 rounded bg-black/10 font-mono text-sm", ":thumb:" }
-                            " 这样的语法。"
+                            "{syntax_suffix_label}"
                         }
-                        p { "显示时会自动替换成 emoji。" }
+                        p { "{display_label}" }
                         div { class: "rounded border border-black/10 bg-black/5 px-3 py-2 text-sm",
-                            span { class: "font-semibold", "示例：" }
-                            span { class: "font-mono", "今天很开心 :happy: 然后给你一个 :thumb:" }
+                            span { class: "font-semibold", "{example_label}" }
+                            span { class: "font-mono", "{example_text}" }
                         }
                         div { class: "grid grid-cols-2 md:grid-cols-3 gap-3",
                             for key in EMOJI_KEYS {
@@ -1172,12 +1221,43 @@ const IMAGE_TUTORIAL_5: Asset = asset!("/tutorial/5.png");
 ///
 #[component]
 pub fn TutorialModal(on_close: EventHandler<()>, on_confirm: EventHandler<bool>) -> Element {
+    let _current_locale = use_locale_refresh();
     let mut dont_show_again = use_signal(|| false);
+    let close_label = t!("common.close").to_string();
+    let heading_label = t!("modals.tutorial.heading").to_string();
+    let add_operator_label = t!("modals.tutorial.add_operator").to_string();
+    let alt_add_operator_label = t!("modals.tutorial.alt_add_operator").to_string();
+    let open_settings_label = t!("modals.tutorial.open_settings").to_string();
+    let operator_fields_label = t!("modals.tutorial.operator_fields").to_string();
+    let finish_operator_label = t!("modals.tutorial.finish_operator").to_string();
+    let session_heading_label = t!("modals.tutorial.session_heading").to_string();
+    let alt_session_label = t!("modals.tutorial.alt_session").to_string();
+    let default_session_label = t!("modals.tutorial.default_session").to_string();
+    let switch_session_label = t!("modals.tutorial.switch_session").to_string();
+    let chat_head_style_label = t!("modals.tutorial.chat_head_style").to_string();
+    let menu_intro_label = t!("modals.tutorial.menu_intro").to_string();
+    let send_other_label = t!("modals.tutorial.send_other").to_string();
+    let send_other_shortcut_label = t!("modals.tutorial.send_other_shortcut").to_string();
+    let send_status_label = t!("modals.tutorial.send_status").to_string();
+    let status_line_label = t!("modals.tutorial.status_line").to_string();
+    let replay_heading_label = t!("modals.tutorial.replay_heading").to_string();
+    let alt_full_chat_label = t!("modals.tutorial.alt_full_chat").to_string();
+    let alt_replay_label = t!("modals.tutorial.alt_replay").to_string();
+    let dialogue_ready_label = t!("modals.tutorial.dialogue_ready").to_string();
+    let start_replay_label = t!("modals.tutorial.start_replay").to_string();
+    let replay_modes_label = t!("modals.tutorial.replay_modes").to_string();
+    let fixed_interval_label = t!("modals.replay.fixed_interval").to_string();
+    let per_char_mode_label = t!("modals.tutorial.per_char_mode").to_string();
+    let interval_formula_label = t!("modals.tutorial.interval_formula").to_string();
+    let recommended_settings_label = t!("modals.tutorial.recommended_settings").to_string();
+    let after_replay_missing_label = t!("modals.tutorial.after_replay_missing").to_string();
+    let share_label = t!("modals.tutorial.share").to_string();
+    let dont_show_again_label = t!("modals.tutorial.dont_show_again").to_string();
 
     rsx! {
         Modal {
-            title: "教程",
-            content_confirmation_button: "关闭",
+            title: t!("modals.tutorial.title").to_string(),
+            content_confirmation_button: close_label,
             on_close,
             on_confirm: move |_| { on_confirm.call(dont_show_again()) },
             max_width: 1280,
@@ -1185,85 +1265,75 @@ pub fn TutorialModal(on_close: EventHandler<()>, on_confirm: EventHandler<bool>)
             {
                 rsx! {
                     div { class: "p-6 max-h-[60vh] overflow-y-auto custom-scrollbar text-black text-base leading-relaxed space-y-3",
-                        h1 { class: "text-3xl font-bold", "对于 baker-dx 的简略教程" }
-                        h2 { class: "text-2xl font-bold", "1. 添加干员" }
+                        h1 { class: "text-3xl font-bold", "{heading_label}" }
+                        h2 { class: "text-2xl font-bold", "{add_operator_label}" }
                         p {
                             img {
                                 class: "max-w-[600px]",
-                                alt: "添加干员",
+                                alt: "{alt_add_operator_label}",
                                 src: IMAGE_TUTORIAL_1,
                             }
                         }
                         p {
                             img {
                                 class: "max-w-[600px]",
-                                alt: "添加干员",
+                                alt: "{alt_add_operator_label}",
                                 src: IMAGE_TUTORIAL_2,
                             }
                         }
-                        p { "左键双击左上角的 //BAKER/会话消息，打开设置界面。" }
-                        p { "第一个输入框是干员名称，第二个是干员头像。" }
-                        p { "两个空填完之后点击添加干员即可，然后关闭设置界面。" }
-                        h2 { class: "text-2xl font-bold mt-10", "2. 会话" }
+                        p { "{open_settings_label}" }
+                        p { "{operator_fields_label}" }
+                        p { "{finish_operator_label}" }
+                        h2 { class: "text-2xl font-bold mt-10", "{session_heading_label}" }
                         p {
-                            img { class: "max-w-[600px]", alt: "会话", src: IMAGE_TUTORIAL_3 }
+                            img { class: "max-w-[600px]", alt: "{alt_session_label}", src: IMAGE_TUTORIAL_3 }
                         }
-                        p { "幸好默认就有 Perlica 的实例会话，我们可以直接用这个。" }
-                        p { "点击 Perlica 的名片就可以切换到她的会话了。" }
+                        p { "{default_session_label}" }
+                        p { "{switch_session_label}" }
                         ul { style: "list-style: circle inside",
+                            li { "{chat_head_style_label}" }
                             li {
-                                "1 处按钮可以更改会话头部的样式，点击后会弹出一个菜单，你可以选择 2 个不同的样式。"
-                            }
-                            li {
-                                "右键输入框右侧的菜单按钮，可以选择："
+                                "{menu_intro_label}"
                                 ul { class: "ml-10", style: "list-style: square inside",
-                                    li { "为对方发送：将输入框中的内容以对方的身份发送。" }
+                                    li { "{send_other_label}" }
                                     li {
-                                        em { "（表情包和图片使用 Ctrl + 左键可以为对方发送）" }
+                                        em { "{send_other_shortcut_label}" }
                                     }
                                     li {
-                                        "发送为状态：将输入框中的内容以状态行的形式发送。"
+                                        "{send_status_label}"
                                         ul { class: "ml-10", style: "list-style: inside",
-                                            li {
-                                                "状态行：状态行是一种特殊的消息，它会在会话中以独立的行展示，通常用于展示时间等其他重要信息。"
-                                            }
+                                            li { "{status_line_label}" }
                                         }
                                     }
                                 }
                             }
                         }
-                        h2 { class: "text-2xl font-bold mt-10", "3. 回放" }
+                        h2 { class: "text-2xl font-bold mt-10", "{replay_heading_label}" }
                         p {
                             img {
                                 class: "max-w-[600px]",
-                                alt: "完整的聊天",
+                                alt: "{alt_full_chat_label}",
                                 src: IMAGE_TUTORIAL_4,
                             }
                             img {
                                 class: "max-w-[600px]",
-                                alt: "回放界面",
+                                alt: "{alt_replay_label}",
                                 src: IMAGE_TUTORIAL_5,
                             }
                         }
-                        p { "现在我们写好一段对话了。" }
-                        p { "右键一个消息，即可开始回放。" }
-                        p { "回放间隔计算有两种模式：" }
+                        p { "{dialogue_ready_label}" }
+                        p { "{start_replay_label}" }
+                        p { "{replay_modes_label}" }
                         ul { style: "list-style: circle inside",
-                            li { "固定间隔" }
-                            li { "按字数：根据消息的字数计算间隔" }
+                            li { "{fixed_interval_label}" }
+                            li { "{per_char_mode_label}" }
                         }
-                        p {
-                            "那么两条消息发送的间隔就为：发送后间隔（第三个） + 输入间隔（就是那个输入动画的间隔）（前两个）"
-                        }
-                        p {
-                            "推荐设置为：\r\n    固定间隔 400ms + 发送后间隔 1000ms，这样子可能大差不差。\r\n    点击开始回放就好了。"
-                        }
-                        p {
-                            "（回放完之后发送消息（或者历史消息）看不到？右上角更多按钮的菜单可以结束回放。）"
-                        }
+                        p { "{interval_formula_label}" }
+                        p { white_space: "pre-line", "{recommended_settings_label}" }
+                        p { "{after_replay_missing_label}" }
                         hr {}
                         p {
-                            em { "如果你觉得这个软件有用，不妨分享一下？！" }
+                            em { "{share_label}" }
                         }
                     }
                     label { class: "flex items-center gap-2 text-black text-base cursor-pointer select-none",
@@ -1273,7 +1343,7 @@ pub fn TutorialModal(on_close: EventHandler<()>, on_confirm: EventHandler<bool>)
                             checked: dont_show_again(),
                             onclick: move |_| dont_show_again.set(!dont_show_again()),
                         }
-                        span { "不再显示" }
+                        span { "{dont_show_again_label}" }
                     }
                 }
             }

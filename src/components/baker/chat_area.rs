@@ -1,6 +1,7 @@
 use crate::components::assets::emojis::to_emoji;
 use crate::components::baker::Route;
 use crate::components::baker::input_bar::InputBar;
+use crate::components::baker::locale::use_locale_refresh;
 use crate::components::baker::modals::{
     EditGroupChatProps, EditMessageModal, EditParticipantsSelvesIds, InsertMessageModal,
     OpsSelection, PickSenderModal, ReactionModal,
@@ -9,6 +10,7 @@ use crate::components::baker::storage::v2::{
     ChatHeadStyle, Contact, Message, MessageKind, Operator, UserProfile,
 };
 use dioxus::prelude::*;
+use rust_i18n::t;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -135,6 +137,7 @@ pub fn ChatArea(
     on_clear_chat: EventHandler<()>,
     on_set_group_ops_list: EventHandler<OpsSelection>,
 ) -> Element {
+    let _current_locale = use_locale_refresh();
     let messages_list = messages.read().clone();
     let mut context_menu = use_signal(|| Option::<(i32, i32, String)>::None);
     let mut editing_msg_id = use_signal(|| Option::<String>::None);
@@ -229,7 +232,7 @@ pub fn ChatArea(
             .iter()
             .find(|op| op.id == contact.id)
             .map(|op| op.name.clone())
-            .unwrap_or_else(|| "未命名会话".to_string())
+            .unwrap_or_else(|| t!("sidebar.unnamed_session").to_string())
     };
     let operators_map: HashMap<&str, &Operator> = operators_list
         .iter()
@@ -252,6 +255,21 @@ pub fn ChatArea(
     let contact_is_group = contact.is_group;
     let contact_id_for_other_text = contact.id.clone();
     let contact_id_for_other_image = contact.id.clone();
+    let edit_message_label = t!("chat.context.edit_message").to_string();
+    let react_label = t!("chat.context.react").to_string();
+    let delete_reaction_label = t!("chat.context.delete_reaction").to_string();
+    let insert_before_label = t!("chat.context.insert_before").to_string();
+    let start_replay_label = t!("chat.context.start_replay").to_string();
+    let delete_message_label = t!("chat.context.delete_message").to_string();
+    let header_style_1_label = t!("chat.header.style_1").to_string();
+    let header_style_2_label = t!("chat.header.style_2").to_string();
+    let clear_messages_label = t!("chat.header.clear_messages").to_string();
+    let clear_chat_label = t!("chat.header.clear_chat").to_string();
+    let export_image_label = t!("chat.header.export_image").to_string();
+    let exit_replay_label = t!("chat.header.exit_replay").to_string();
+    let group_settings_label = t!("chat.header.group_settings").to_string();
+    let edit_participants_selves_ids_label =
+        t!("chat.header.edit_participants_selves_ids").to_string();
     let context_menu_value = context_menu();
     let context_menu_view = context_menu_value.as_ref().map(|(x, y, msg_id)| {
         let show_reaction = messages_list
@@ -281,7 +299,7 @@ pub fn ChatArea(
                             context_menu.set(None);
                         }
                     },
-                    "修改消息"
+                    "{edit_message_label}"
                 }
                 if show_reaction {
                     div {
@@ -293,7 +311,7 @@ pub fn ChatArea(
                                 context_menu.set(None);
                             }
                         },
-                        "反应…"
+                        "{react_label}"
                     }
                 }
                 if show_delete_reaction {
@@ -303,7 +321,7 @@ pub fn ChatArea(
                             let msg_id = msg_id.clone();
                             move |_| handle_delete_reaction(msg_id.clone())
                         },
-                        "删除反应"
+                        "{delete_reaction_label}"
                     }
                 }
                 div {
@@ -315,7 +333,7 @@ pub fn ChatArea(
                             context_menu.set(None);
                         }
                     },
-                    "在此前插入…"
+                    "{insert_before_label}"
                 }
                 div {
                     class: "px-4 py-2 hover:bg-[#3a3a3a] cursor-pointer text-white text-sm transition-colors",
@@ -326,7 +344,7 @@ pub fn ChatArea(
                             context_menu.set(None);
                         }
                     },
-                    "从此开始回放…"
+                    "{start_replay_label}"
                 }
                 div {
                     class: "px-4 py-2 hover:bg-[#3a3a3a] cursor-pointer text-red-400 text-sm transition-colors",
@@ -334,7 +352,7 @@ pub fn ChatArea(
                         let msg_id = msg_id.clone();
                         move |_| handle_delete(msg_id.clone())
                     },
-                    "删除消息"
+                    "{delete_message_label}"
                 }
             }
         }
@@ -591,7 +609,7 @@ pub fn ChatArea(
                                         on_update_chat_head_style.call(ChatHeadStyle::Default);
                                         header_menu_open.set(false);
                                     },
-                                    "会话头样式 1"
+                                    "{header_style_1_label}"
                                 }
                                 div {
                                     class: "px-4 py-2 hover:bg-[#3a3a3a] cursor-pointer text-white text-sm transition-colors",
@@ -599,7 +617,7 @@ pub fn ChatArea(
                                         on_update_chat_head_style.call(ChatHeadStyle::Alt);
                                         header_menu_open.set(false);
                                     },
-                                    "会话头样式 2"
+                                    "{header_style_2_label}"
                                 }
                                 div { class: "h-px bg-gray-600 my-1" }
                                 div {
@@ -608,7 +626,7 @@ pub fn ChatArea(
                                         on_clear_messages.call(());
                                         header_menu_open.set(false);
                                     },
-                                    "清除聊天内容"
+                                    "{clear_messages_label}"
                                 }
                                 div {
                                     class: "px-4 py-2 hover:bg-[#3a3a3a] cursor-pointer text-white text-sm transition-colors",
@@ -616,7 +634,7 @@ pub fn ChatArea(
                                         on_clear_chat.call(());
                                         header_menu_open.set(false);
                                     },
-                                    "清除聊天内容和会话"
+                                    "{clear_chat_label}"
                                 }
                                 div {
                                     class: "px-4 py-2 hover:bg-[#3a3a3a] cursor-pointer text-white text-sm transition-colors",
@@ -627,7 +645,7 @@ pub fn ChatArea(
                                             });
                                         header_menu_open.set(false);
                                     },
-                                    "导出会话到图片"
+                                    "{export_image_label}"
                                 }
                                 if is_replaying {
                                     div {
@@ -636,7 +654,7 @@ pub fn ChatArea(
                                             on_exit_replay.call(());
                                             header_menu_open.set(false);
                                         },
-                                        "退出回放"
+                                        "{exit_replay_label}"
                                     }
                                 }
                                 {
@@ -648,7 +666,7 @@ pub fn ChatArea(
                                                     show_set_group_ops_list.set(true);
                                                     header_menu_open.set(false);
                                                 },
-                                                "群组设置……"
+                                                "{group_settings_label}"
                                             }
                                             div {
                                                 class: "px-4 py-2 hover:bg-[#3a3a3a] cursor-pointer text-white text-sm transition-colors",
@@ -656,7 +674,7 @@ pub fn ChatArea(
                                                     show_set_participants_selves_ids.set(true);
                                                     header_menu_open.set(false);
                                                 },
-                                                "更改participants_selves_ids……"
+                                                "{edit_participants_selves_ids_label}"
                                             }
                                         }
                                     } else {

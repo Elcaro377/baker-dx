@@ -1,5 +1,6 @@
 use crate::components::baker::capture::CapturePage;
 use crate::components::baker::chat_area::{ChatArea, PendingTyping, ReplayTypingPhase};
+use crate::components::baker::locale::use_locale_refresh;
 use crate::components::baker::modals::{
     EmojiSupportModal, NewChatModal, NewChatSelection, Notice, OpsSelection, ProfileModal,
     ReplayIntervalMode, ReplaySettings, ReplaySettingsModal, TutorialModal, UpdateAvailableModal,
@@ -15,6 +16,7 @@ use dioxus::prelude::*;
 #[cfg(target_arch = "wasm32")]
 use gloo_timers::future::TimeoutFuture;
 use reqwest::Client;
+use rust_i18n::t;
 use serde::Deserialize;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Duration;
@@ -187,6 +189,7 @@ async fn open_url(url: String) {
 #[component]
 pub fn BakerLayout() -> Element {
     let mut app_state = use_context::<Signal<crate::components::baker::storage::v2::AppState>>();
+    let _current_locale = use_locale_refresh();
 
     let mut show_new_chat = use_signal(|| false);
     let mut show_profile = use_signal(|| false);
@@ -760,7 +763,7 @@ pub fn BakerLayout() -> Element {
                         list.push(Message {
                             id: topic_end_id.clone(),
                             sender_id: user_id.clone(),
-                            content: "话题结束，暂无新话题".to_string(),
+                            content: t!("layout.topic_finished").to_string(),
                             kind: MessageKind::TopicEnded,
                             animate: true,
                             animate_reactions: false,
@@ -809,6 +812,9 @@ pub fn BakerLayout() -> Element {
             }
         }
     });
+    let friends_title_label = t!("layout.friends_title").to_string();
+    let tutorial_link_label = t!("layout.tutorial_link").to_string();
+    let no_session_selected_label = t!("layout.no_session_selected").to_string();
 
     rsx! {
         div {
@@ -903,7 +909,7 @@ pub fn BakerLayout() -> Element {
                         ondoubleclick: move |_| {
                             navigator.push(Route::SettingsPage {});
                         },
-                        "//BAKER/会话消息"
+                        "{friends_title_label}"
                     }
                     if !hide_tutorial {
                         a {
@@ -913,7 +919,7 @@ pub fn BakerLayout() -> Element {
                                 evt.prevent_default();
                                 show_tutorial.set(true);
                             },
-                            "点击这里看教程！！"
+                            "{tutorial_link_label}"
                         }
                     }
                 }
@@ -1011,7 +1017,7 @@ pub fn BakerLayout() -> Element {
                     }
                 } else {
                     div { class: "flex-1 flex items-center justify-center text-gray-500 bg-gray-900/50 border border-gray-600 backdrop-blur-sm",
-                        "请选择一个会话"
+                        "{no_session_selected_label}"
                     }
                 }
             }

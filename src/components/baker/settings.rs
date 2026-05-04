@@ -1,13 +1,20 @@
 use crate::components::baker::layout::load_repo_config;
+use crate::components::baker::locale::{
+    EN_US_LOCALE, LocaleContext, ZH_CN_LOCALE, apply_locale, save_locale_to_local_storage,
+};
 use crate::components::baker::storage::v2::{BackgroundMode, Operator};
 use crate::components::baker::{Route, data_url_from_bytes, mime_from_filename, use_synced_field};
 use crate::dioxus_elements::FileData;
 use dioxus::prelude::*;
+use rust_i18n::t;
 use uuid::Uuid;
 
 #[component]
 pub fn SettingsPage() -> Element {
     let mut app_state = use_context::<Signal<crate::components::baker::storage::v2::AppState>>();
+    let locale_context = use_context::<LocaleContext>();
+    let mut locale_signal = locale_context.locale;
+    let current_locale = locale_context.current();
 
     let repo_config = load_repo_config().unwrap();
     let repo_url = format!(
@@ -30,6 +37,7 @@ pub fn SettingsPage() -> Element {
     enum SettingsSection {
         Operators,
         Background,
+        Language,
         About,
     }
 
@@ -94,11 +102,46 @@ pub fn SettingsPage() -> Element {
     } else {
         "text-gray-400 hover:text-white hover:bg-white/5"
     };
+    let language_tab_class = if matches!(section(), SettingsSection::Language) {
+        "bg-[#2b2b2b] text-white"
+    } else {
+        "text-gray-400 hover:text-white hover:bg-white/5"
+    };
     let about_tab_class = if matches!(section(), SettingsSection::About) {
         "bg-[#2b2b2b] text-white"
     } else {
         "text-gray-400 hover:text-white hover:bg-white/5"
     };
+    let settings_title_label = t!("settings.title").to_string();
+    let operators_tab_label = t!("settings.tabs.operators").to_string();
+    let background_tab_label = t!("settings.tabs.background").to_string();
+    let language_tab_label = t!("settings.tabs.language").to_string();
+    let about_tab_label = t!("settings.tabs.about").to_string();
+    let language_title_label = t!("settings.language.title").to_string();
+    let language_description_label = t!("settings.language.description").to_string();
+    let language_accuracy_notice_label = t!("settings.language.accuracy_notice").to_string();
+    let language_current_label = t!("settings.language.current").to_string();
+    let zh_cn_label = t!("locales.zh_cn").to_string();
+    let en_us_label = t!("locales.en_us").to_string();
+    let zh_cn_selected = current_locale == ZH_CN_LOCALE;
+    let en_us_selected = current_locale == EN_US_LOCALE;
+    let add_operator_title_label = t!("settings.operators.add_title").to_string();
+    let operator_name_placeholder = t!("settings.operators.name_placeholder").to_string();
+    let add_operator_button_label = t!("settings.operators.add_button").to_string();
+    let cancel_label = t!("common.cancel").to_string();
+    let save_label = t!("common.save").to_string();
+    let edit_label = t!("common.edit").to_string();
+    let delete_label = t!("common.delete").to_string();
+    let background_title_label = t!("settings.background.title").to_string();
+    let dot_dark_label = t!("settings.background.dot_dark").to_string();
+    let dot_light_label = t!("settings.background.dot_light").to_string();
+    let custom_color_label = t!("settings.background.custom_color").to_string();
+    let custom_image_todo_label = t!("settings.background.custom_image_todo").to_string();
+    let about_description_label = t!("settings.about.description").to_string();
+    let about_author_label = t!("settings.about.author").to_string();
+    let about_open_source_at_label = t!("settings.about.open_source_at").to_string();
+    let about_license_heading_label = t!("settings.about.license_heading").to_string();
+    let about_license_summary_label = t!("settings.about.license_summary").to_string();
 
     let background_style = use_memo(move || {
         let bg = background.read().clone();
@@ -134,7 +177,7 @@ pub fn SettingsPage() -> Element {
                     },
                     "←"
                 }
-                h1 { class: "text-white text-lg font-bold", "设置" }
+                h1 { class: "text-white text-lg font-bold", "{settings_title_label}" }
             }
             div { class: "flex-1 flex min-h-0",
                 div { class: "w-64 shrink-0 border-r border-gray-700 bg-[#1f1f1f]/70 p-4",
@@ -142,17 +185,22 @@ pub fn SettingsPage() -> Element {
                         button {
                             class: "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer {operators_tab_class}",
                             onclick: move |_| section.set(SettingsSection::Operators),
-                            "干员管理"
+                            "{operators_tab_label}"
                         }
                         button {
                             class: "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer {background_tab_class}",
                             onclick: move |_| section.set(SettingsSection::Background),
-                            "背景设置"
+                            "{background_tab_label}"
+                        }
+                        button {
+                            class: "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer {language_tab_class}",
+                            onclick: move |_| section.set(SettingsSection::Language),
+                            "{language_tab_label}"
                         }
                         button {
                             class: "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer {about_tab_class}",
                             onclick: move |_| section.set(SettingsSection::About),
-                            "关于"
+                            "{about_tab_label}"
                         }
                     }
                 }
@@ -161,12 +209,12 @@ pub fn SettingsPage() -> Element {
                         div { class: "max-w-[820px] space-y-6",
                             div { class: "p-4 bg-[#2b2b2b] rounded-xl border border-gray-600",
                                 h2 { class: "text-white text-base font-bold mb-3",
-                                    "添加新干员"
+                                    "{add_operator_title_label}"
                                 }
                                 div { class: "space-y-3 mb-3",
                                     input {
                                         class: "w-full bg-[#222] border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500",
-                                        placeholder: "干员代号 (Name)",
+                                        placeholder: "{operator_name_placeholder}",
                                         value: "{new_name}",
                                         oninput: move |e| new_name.set(e.value()),
                                     }
@@ -196,7 +244,7 @@ pub fn SettingsPage() -> Element {
                                 button {
                                     class: "w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded text-sm font-medium transition-colors cursor-pointer",
                                     onclick: handle_add,
-                                    "添加干员"
+                                    "{add_operator_button_label}"
                                 }
                             }
 
@@ -251,12 +299,12 @@ pub fn SettingsPage() -> Element {
                                                         button {
                                                             class: "px-3 py-1 text-gray-400 hover:text-white text-sm cursor-pointer",
                                                             onclick: move |_| handle_edit_cancel(()),
-                                                            "取消"
+                                                            "{cancel_label}"
                                                         }
                                                         button {
                                                             class: "px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm font-medium cursor-pointer",
                                                             onclick: move |_| handle_edit_save(op_id.clone()),
-                                                            "保存"
+                                                            "{save_label}"
                                                         }
                                                     }
                                                 }
@@ -281,12 +329,12 @@ pub fn SettingsPage() -> Element {
                                                         button {
                                                             class: "text-gray-300 hover:text-white text-sm px-2 py-1 cursor-pointer",
                                                             onclick: move |_| handle_edit_start(op_clone.clone()),
-                                                            "编辑"
+                                                            "{edit_label}"
                                                         }
                                                         button {
                                                             class: "text-red-400 hover:text-red-300 text-sm px-2 py-1 cursor-pointer",
                                                             onclick: move |_| handle_delete(op_id.clone()),
-                                                            "删除"
+                                                            "{delete_label}"
                                                         }
                                                     }
                                                 }
@@ -298,7 +346,7 @@ pub fn SettingsPage() -> Element {
                         }
                     } else if matches!(section(), SettingsSection::Background) {
                         div { class: "max-w-[820px] space-y-6",
-                            h2 { class: "text-white text-base font-bold", "背景设置" }
+                            h2 { class: "text-white text-base font-bold", "{background_title_label}" }
                             div { class: "space-y-3",
                                 select {
                                     class: "w-full bg-[#222] border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500",
@@ -312,11 +360,11 @@ pub fn SettingsPage() -> Element {
                                             _ => BackgroundMode::DotDark,
                                         };
                                     },
-                                    option { value: "dot_dark", "点状-深色" }
-                                    option { value: "dot_light", "点状-浅色" }
-                                    option { value: "custom_color", "自定义颜色" }
+                                    option { value: "dot_dark", "{dot_dark_label}" }
+                                    option { value: "dot_light", "{dot_light_label}" }
+                                    option { value: "custom_color", "{custom_color_label}" }
                                     option { disabled: true, value: "custom_image",
-                                        "自定义图片 - TODO"
+                                        "{custom_image_todo_label}"
                                     }
                                 }
                                 if matches!(current_background.mode, BackgroundMode::CustomColor) {
@@ -363,16 +411,42 @@ pub fn SettingsPage() -> Element {
                                 }
                             }
                         }
+                    } else if matches!(section(), SettingsSection::Language) {
+                        div { class: "max-w-[820px] space-y-6",
+                            div { class: "space-y-2",
+                                h2 { class: "text-white text-base font-bold", "{language_title_label}" }
+                                p { class: "text-gray-400 text-sm", "{language_description_label}" }
+                                p { class: "text-yellow-300 text-sm", "{language_accuracy_notice_label}" }
+                            }
+                            div { class: "max-w-sm space-y-3",
+                                label { class: "block text-gray-300 text-sm", "{language_current_label}" }
+                                select {
+                                    class: "w-full bg-[#222] border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500",
+                                    value: "{current_locale}",
+                                    oninput: move |e| {
+                                        let selected_locale = apply_locale(&e.value()).to_string();
+                                        locale_signal.set(selected_locale.clone());
+                                        spawn(async move {
+                                            if let Err(err) = save_locale_to_local_storage(&selected_locale).await {
+                                                error!("failed to save locale: {}", err);
+                                            }
+                                        });
+                                    },
+                                    option { value: ZH_CN_LOCALE, selected: zh_cn_selected, "{zh_cn_label}" }
+                                    option { value: EN_US_LOCALE, selected: en_us_selected, "{en_us_label}" }
+                                }
+                            }
+                        }
                     } else if matches!(section(), SettingsSection::About) {
                         div {
                             h1 { class: "text-4xl font-bold", "Baker" }
                             h2 { class: "text-xl mt-2 mb-10",
-                                "用以还原《明日方舟：终末地》中Baker的应用。"
+                                "{about_description_label}"
                             }
 
-                            p { "项目作者：Wanye_7300" }
+                            p { "{about_author_label}" }
                             div {
-                                "开源在："
+                                "{about_open_source_at_label}"
                                 a {
                                     class: "text-blue-500 hover:underline",
                                     href: repo_url,
@@ -380,8 +454,8 @@ pub fn SettingsPage() -> Element {
                                 }
                             }
 
-                            h2 { class: "text-xl mt-10 mb-2", "开源协议" }
-                            p { "本项目基于 MIT 协议开源。" }
+                            h2 { class: "text-xl mt-10 mb-2", "{about_license_heading_label}" }
+                            p { "{about_license_summary_label}" }
                             p { class: "font-mono", "MIT License" }
                             p { class: "font-mono", "Copyright (c) 2026 Wanye_7300" }
                             p { class: "font-mono",

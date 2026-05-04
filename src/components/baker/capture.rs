@@ -1,11 +1,13 @@
 use dioxus::prelude::*;
+use rust_i18n::t;
 
 use crate::components::baker::{
-    Route, capture, chat_area::ChatArea, download_image, modals::Modal,
+    Route, capture, chat_area::ChatArea, download_image, locale::use_locale_refresh, modals::Modal,
 };
 
 #[component]
 pub(super) fn CapturePage(contact_id: String) -> Element {
+    let _current_locale = use_locale_refresh();
     let app_state = use_context::<Signal<crate::components::baker::storage::v2::AppState>>();
     let contacts = &app_state.read().contacts;
     let mut img_src = use_signal(String::new);
@@ -32,6 +34,13 @@ pub(super) fn CapturePage(contact_id: String) -> Element {
     let mut scale = use_signal(|| 1.0f64);
 
     let mut show_download_success = use_signal(|| false);
+    let success_title_label = t!("capture.success_title").to_string();
+    let ok_label = t!("common.ok").to_string();
+    let downloaded_label = t!("capture.downloaded_to_downloads").to_string();
+    let title_label = t!("capture.title").to_string();
+    let width_label = t!("capture.width").to_string();
+    let scale_label = t!("capture.scale").to_string();
+    let download_label = t!("capture.download").to_string();
 
     use_effect(move || {
         width.read();
@@ -90,14 +99,14 @@ pub(super) fn CapturePage(contact_id: String) -> Element {
     rsx! {
         if show_download_success() {
             Modal {
-                title: "操作成功",
-                content_confirmation_button: "好",
+                title: success_title_label,
+                content_confirmation_button: ok_label,
                 on_close: move |_| show_download_success.set(false),
                 on_confirm: move |_| show_download_success.set(false),
 
                 {
                     rsx! {
-                        p { class: "text-black", "已下载到用户的下载目录中。" }
+                        p { class: "text-black", "{downloaded_label}" }
                     }
                 }
             }
@@ -124,7 +133,7 @@ pub(super) fn CapturePage(contact_id: String) -> Element {
                     },
                     "←"
                 }
-                h1 { class: "text-white text-lg font-bold", "导出截图" }
+                h1 { class: "text-white text-lg font-bold", "{title_label}" }
             }
             div {
                 width: "100%",
@@ -134,13 +143,13 @@ pub(super) fn CapturePage(contact_id: String) -> Element {
                 padding: "16px",
                 box_sizing: "border-box",
                 overflow_x: "hidden",
-                overflow_y: "auto",
-                div {
+                    overflow_y: "auto",
+                    div {
                     flex: "1 1 auto",
                     min_width: "200px",
                     min_height: "200px",
                     div { class: "space-y-1",
-                        label { class: "block text-white text-sm", "宽度" }
+                        label { class: "block text-white text-sm", "{width_label}" }
                         input {
                             class: "w-full bg-[#e9e9e9] border border-black/10 rounded p-3 text-black text-sm focus:outline-none focus:border-black/30 resize-none",
                             r#type: "number",
@@ -152,7 +161,7 @@ pub(super) fn CapturePage(contact_id: String) -> Element {
                     }
                     div { class: "space-y-1 mt-4",
                         label { class: "block text-white text-sm",
-                            "缩放倍率（如2x即为以两倍的分辨率截图）"
+                            "{scale_label}"
                         }
                         input {
                             class: "w-full bg-[#e9e9e9] border border-black/10 rounded p-3 text-black text-sm focus:outline-none focus:border-black/30 resize-none",
@@ -185,7 +194,7 @@ pub(super) fn CapturePage(contact_id: String) -> Element {
                                     }
                                 });
                             },
-                            "下载"
+                            "{download_label}"
                         }
                     }
                 }

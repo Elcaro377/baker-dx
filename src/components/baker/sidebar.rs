@@ -1,5 +1,7 @@
+use crate::components::baker::locale::LocaleContext;
 use crate::components::baker::storage::v2::{Contact, Operator};
 use dioxus::prelude::*;
+use rust_i18n::t;
 
 const LIST_NEW_SESSION: Asset = asset!("/assets/images/list_new_session.png");
 
@@ -11,8 +13,11 @@ pub fn Sidebar(
     on_add_click: EventHandler<()>,
     need_to_scroll_down: Signal<bool>,
 ) -> Element {
+    let locale_context = use_context::<LocaleContext>();
+    let _current_locale = locale_context.current();
     let contacts_list = contacts.read().clone();
     let ops_list = operators.read().clone();
+    let add_new_session_label = t!("sidebar.add_new_session").to_string();
 
     rsx! {
         div { class: "w-80 h-full flex flex-col min-h-0 bg-transparent relative",
@@ -47,7 +52,7 @@ pub fn Sidebar(
                     span {
                         class: "font-bold text-sm",
                         style: "color: rgb(68, 68, 68);",
-                        "添加新会话"
+                        "{add_new_session_label}"
                     }
                     img {
                         src: "{LIST_NEW_SESSION}",
@@ -66,12 +71,14 @@ fn ContactItem(
     is_selected: bool,
     onclick: EventHandler<MouseEvent>,
 ) -> Element {
+    let locale_context = use_context::<LocaleContext>();
+    let _current_locale = locale_context.current();
     let display_name = if !contact.name.is_empty() {
         contact.name.clone()
     } else if let Some(op) = operator.as_ref() {
         op.name.clone()
     } else {
-        "未命名会话".to_string()
+        t!("sidebar.unnamed_session").to_string()
     };
     let avatar_url = if !contact.avatar_url.is_empty() {
         contact.avatar_url.clone()

@@ -1,7 +1,9 @@
 use crate::components::assets::emojis::{EMOJI_KEYS, to_emoji};
+use crate::components::baker::locale::use_locale_refresh;
 use crate::components::baker::{data_url_from_bytes, mime_from_filename};
 use crate::dioxus_elements::FileData;
 use dioxus::prelude::*;
+use rust_i18n::t;
 
 const EMOJI_COMPLETION_MAX_HEIGHT_PX: usize = 256;
 
@@ -88,6 +90,14 @@ pub fn InputBar(
     clear_text_token: ReadSignal<usize>,
     need_to_scroll_down: Signal<bool>,
 ) -> Element {
+    let _current_locale = use_locale_refresh();
+    let send_message_placeholder = t!("input.send_message_placeholder").to_string();
+    let send_for_member_label = t!("input.send_for_member").to_string();
+    let send_for_other_label = t!("input.send_for_other").to_string();
+    let send_status_label = t!("input.send_status").to_string();
+    let send_image_label = t!("input.send_image").to_string();
+    let upload_label = t!("input.upload").to_string();
+
     let mut text = use_signal(String::new);
     let mut send_menu = use_signal(|| Option::<(i32, i32)>::None);
     let mut plus_menu = use_signal(|| Option::<(i32, i32)>::None);
@@ -193,9 +203,9 @@ pub fn InputBar(
                             send_menu.set(None);
                         },
                         if is_group {
-                            "为……发送……"
+                            "{send_for_member_label}"
                         } else {
-                            "为对方发送…"
+                            "{send_for_other_label}"
                         }
                     }
                     div {
@@ -204,7 +214,7 @@ pub fn InputBar(
                             handle_submit_status();
                             send_menu.set(None);
                         },
-                        "发送为状态"
+                        "{send_status_label}"
                     }
                 }
             }
@@ -215,7 +225,7 @@ pub fn InputBar(
                     style: "{menu_style(x, y, 144, 56)}",
                     onclick: |e| e.stop_propagation(),
                     div { class: "px-4 py-2 hover:bg-[#3a3a3a] cursor-pointer text-white text-sm transition-colors relative overflow-hidden",
-                        "发送图片……"
+                        "{send_image_label}"
                         input {
                             key: "{image_input_token()}",
                             r#type: "file",
@@ -292,7 +302,7 @@ pub fn InputBar(
                                             }
                                         },
                                     }
-                                    "上传"
+                                    "{upload_label}"
                                 }
                                 button {
                                     class: "w-14 h-14 rounded-lg bg-white/60 hover:bg-white/80 transition-colors flex items-center justify-center",
@@ -381,7 +391,7 @@ pub fn InputBar(
                 }
                 input {
                     class: "flex-1 bg-transparent border-none outline-none text-black font-medium text-sm placeholder-gray-500",
-                    placeholder: "发消息",
+                    placeholder: "{send_message_placeholder}",
                     value: "{text}",
                     oninput: move |evt| {
                         text.set(evt.value());
@@ -389,37 +399,38 @@ pub fn InputBar(
                         dismissed_emoji_completion.set(None);
                     },
                     onkeydown: move |evt| {
-                        if let Some(completion) = emoji_completion_for(&text()) {
-                            if dismissed_emoji_completion() != Some(completion.start) {
-                                let key_count = completion.keys.len();
-                                match evt.key() {
-                                    Key::ArrowDown => {
-                                        evt.prevent_default();
-                                        active_emoji_completion.set((active_emoji_completion() + 1) % key_count);
-                                        return;
-                                    }
-                                    Key::ArrowUp => {
-                                        evt.prevent_default();
-                                        active_emoji_completion
-                                            .set((active_emoji_completion() + key_count - 1) % key_count);
-                                        return;
-                                    }
-                                    Key::Enter | Key::Tab => {
-                                        evt.prevent_default();
-                                        let active_index = active_emoji_completion().min(key_count - 1);
-                                        if let Some(key) = completion.keys.get(active_index).copied() {
-                                            apply_emoji_completion(completion, key);
-                                        }
-                                        return;
-                                    }
-                                    Key::Escape => {
-                                        evt.prevent_default();
-                                        active_emoji_completion.set(0);
-                                        dismissed_emoji_completion.set(Some(completion.start));
-                                        return;
-                                    }
-                                    _ => {}
+                        if let Some(completion) = emoji_completion_for(&text())
+                            && dismissed_emoji_completion() != Some(completion.start)
+                        {
+                            let key_count = completion.keys.len();
+                            match evt.key() {
+                                Key::ArrowDown => {
+                                    evt.prevent_default();
+                                    active_emoji_completion
+                                        .set((active_emoji_completion() + 1) % key_count);
+                                    return;
                                 }
+                                Key::ArrowUp => {
+                                    evt.prevent_default();
+                                    active_emoji_completion
+                                        .set((active_emoji_completion() + key_count - 1) % key_count);
+                                    return;
+                                }
+                                Key::Enter | Key::Tab => {
+                                    evt.prevent_default();
+                                    let active_index = active_emoji_completion().min(key_count - 1);
+                                    if let Some(key) = completion.keys.get(active_index).copied() {
+                                        apply_emoji_completion(completion, key);
+                                    }
+                                    return;
+                                }
+                                Key::Escape => {
+                                    evt.prevent_default();
+                                    active_emoji_completion.set(0);
+                                    dismissed_emoji_completion.set(Some(completion.start));
+                                    return;
+                                }
+                                _ => {}
                             }
                         }
                         if evt.key() == Key::Enter {

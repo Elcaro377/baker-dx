@@ -7,10 +7,17 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use components::baker::Route;
+use components::baker::locale::{
+    DEFAULT_LOCALE, LocaleContext, apply_locale, load_locale_from_local_storage,
+    save_locale_to_local_storage,
+};
 use components::baker::storage::v2::AppState;
 use components::baker::storage::{load_state, save_state};
+use rust_i18n::t;
 
 mod components;
+
+rust_i18n::i18n!("locales", fallback = "zh-CN");
 
 // We can import assets in dioxus with the `asset!` macro. This macro takes a path to an asset relative to the crate root.
 // The macro returns an `Asset` type that will display as the path to the asset in the browser or a local path in desktop bundles.
@@ -24,6 +31,8 @@ const FONT: Asset = asset!("/assets/SourceHanSansSC-Regular.otf");
 const FONT_BENDER: Asset = asset!("/assets/bender.otf");
 
 fn main() {
+    apply_locale(DEFAULT_LOCALE);
+
     #[cfg(all(not(target_arch = "wasm32"), feature = "desktop"))]
     {
         let icon = load_window_icon();
@@ -98,12 +107,16 @@ fn desktop_data_dir() -> PathBuf {
 #[component]
 fn App() -> Element {
     let app_state = use_signal(AppState::default);
+    let locale = use_signal(|| DEFAULT_LOCALE.to_string());
+    let locale_ready = use_signal(|| false);
     let storage_ready = use_signal(|| false);
     let load_started = use_hook(|| Rc::new(Cell::new(false)));
+    let locale_load_started = use_hook(|| Rc::new(Cell::new(false)));
     let save_revision = use_hook(|| Rc::new(Cell::new(0u64)));
     let skip_initial_save = use_hook(|| Rc::new(Cell::new(false)));
     let title_toast_shown = use_hook(|| Rc::new(Cell::new(false)));
     let load_started_for_effect = load_started.clone();
+    let locale_load_started_for_effect = locale_load_started.clone();
     let save_revision_for_load = save_revision.clone();
     let skip_initial_save_for_load = skip_initial_save.clone();
     let save_revision_for_save = save_revision.clone();
@@ -111,6 +124,7 @@ fn App() -> Element {
     let title_toast_shown_for_effect = title_toast_shown.clone();
 
     use_context_provider(|| app_state);
+    use_context_provider(|| LocaleContext { locale });
 
     use_effect(move || {
         if load_started_for_effect.get() {
@@ -132,6 +146,34 @@ fn App() -> Element {
     });
 
     use_effect(move || {
+        if locale_load_started_for_effect.get() {
+            return;
+        }
+        locale_load_started_for_effect.set(true);
+
+        let mut locale = locale;
+        let mut locale_ready = locale_ready;
+        spawn(async move {
+            let loaded_locale = match load_locale_from_local_storage().await {
+                Ok(locale) => locale,
+                Err(err) => {
+                    error!("failed to load locale: {}", err);
+                    DEFAULT_LOCALE
+                }
+            };
+            let loaded_locale = apply_locale(loaded_locale);
+            locale.set(loaded_locale.to_string());
+            if let Err(err) = save_locale_to_local_storage(loaded_locale).await {
+                error!("failed to save locale: {}", err);
+            }
+            locale_ready.set(true);
+        });
+    });
+
+    use_effect(move || {
+        if !locale_ready() {
+            return;
+        }
         if title_toast_shown_for_effect.get() {
             return;
         }
@@ -295,6 +337,7 @@ fn add_toast_notification_title() -> anyhow::Result<()> {
     const toast_div = document.querySelector("#toast");
     const title = await dioxus.recv();
     const description = await dioxus.recv();
+    const license_suffix = await dioxus.recv();
 
     const toast = document.createElement("div");
     toast.setAttribute("class", "toast_notification");
@@ -304,7 +347,7 @@ fn add_toast_notification_title() -> anyhow::Result<()> {
     h1.textContent = title;
 
     const desc = document.createElement("p");
-    desc.textContent = description + ", licensed under MIT License";
+    desc.textContent = description + license_suffix;
 
     const endfield_industries = document.createElement("div");
     endfield_industries.textContent = "Endfield Industries";
@@ -327,6 +370,7 @@ fn add_toast_notification_title() -> anyhow::Result<()> {
 
     eval.send(String::from("Baker-Dx"))?;
     eval.send(env!("CARGO_PKG_VERSION"))?;
+    eval.send(t!("app.version_license_suffix").to_string())?;
 
     Ok(())
 }

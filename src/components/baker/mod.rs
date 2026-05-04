@@ -2,6 +2,7 @@ pub mod capture;
 pub mod chat_area;
 pub mod input_bar;
 pub mod layout;
+pub mod locale;
 pub mod modals;
 pub mod settings;
 pub mod sidebar;
