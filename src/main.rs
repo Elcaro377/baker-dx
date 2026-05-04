@@ -102,11 +102,13 @@ fn App() -> Element {
     let load_started = use_hook(|| Rc::new(Cell::new(false)));
     let save_revision = use_hook(|| Rc::new(Cell::new(0u64)));
     let skip_initial_save = use_hook(|| Rc::new(Cell::new(false)));
+    let title_toast_shown = use_hook(|| Rc::new(Cell::new(false)));
     let load_started_for_effect = load_started.clone();
     let save_revision_for_load = save_revision.clone();
     let skip_initial_save_for_load = skip_initial_save.clone();
     let save_revision_for_save = save_revision.clone();
     let skip_initial_save_for_save = skip_initial_save.clone();
+    let title_toast_shown_for_effect = title_toast_shown.clone();
 
     use_context_provider(|| app_state);
 
@@ -130,9 +132,21 @@ fn App() -> Element {
     });
 
     use_effect(move || {
+        if title_toast_shown_for_effect.get() {
+            return;
+        }
+        title_toast_shown_for_effect.set(true);
+
+        spawn(async move {
+            let _ = add_toast_notification_title();
+        });
+    });
+
+    use_effect(move || {
         if !storage_ready() {
             return;
         }
+
         let snapshot = app_state.read().clone();
         if skip_initial_save_for_save.get() {
             skip_initial_save_for_save.set(false);
@@ -185,21 +199,6 @@ fn App() -> Element {
         FONT_BENDER.bundled().bundled_path()
     );
 
-    // The `rsx!` macro lets us define HTML inside of rust. It expands to an Element with all of our HTML inside.
-    if !storage_ready() {
-        return rsx! {
-            document::Link { rel: "icon", href: FAVICON }
-            document::Link { rel: "stylesheet", href: MAIN_CSS }
-            document::Link { rel: "stylesheet", href: TAILWIND_CSS }
-            document::Link { rel: "stylesheet", href: MODAL_CSS }
-            document::Style { {font_face.clone()} }
-            document::Style { {font_face_bender.clone()} }
-            document::Title { "Baker" }
-
-            LoadingNameCard {}
-        };
-    }
-
     rsx! {
         // In addition to element and text (which we will see later), rsx can contain other components. In this case,
         // we are using the `document::Link` component to add a link to our favicon and main CSS file into the head of our app.
@@ -212,9 +211,15 @@ fn App() -> Element {
         document::Style { {font_face_bender.clone()} }
         document::Title { "Baker" }
 
-        // The router component renders the route enum we defined above. It will handle synchronization of the URL and render
-        // the layouts and components for the active route.
-        Router::<Route> {}
+        div { id: "toast" }
+
+        if !storage_ready() {
+            LoadingNameCard {}
+        } else {
+            // The router component renders the route enum we defined above. It will handle synchronization of the URL and render
+            // the layouts and components for the active route.
+            Router::<Route> {}
+        }
     }
 }
 
@@ -248,4 +253,80 @@ fn LoadingNameCard() -> Element {
             }
         }
     }
+}
+
+#[allow(dead_code)]
+fn add_toast_notification(title: String, description: String) -> anyhow::Result<()> {
+    let eval = document::eval(
+        r##"
+    const toast_div = document.querySelector("#toast");
+    const title = await dioxus.recv();
+    const description = await dioxus.recv();
+
+    const toast = document.createElement("div");
+    toast.setAttribute("class", "toast_notification");
+
+    const h1 = document.createElement("h1");
+    h1.textContent = title;
+
+    const desc = document.createElement("p");
+    desc.textContent = description;
+
+    toast.appendChild(h1);
+    toast.appendChild(desc);
+
+    toast_div.appendChild(toast);
+
+    setTimeout(() => {
+        toast.remove();
+    }, 1000);
+    "##,
+    );
+
+    eval.send(title)?;
+    eval.send(description)?;
+
+    Ok(())
+}
+
+fn add_toast_notification_title() -> anyhow::Result<()> {
+    let eval = document::eval(
+        r##"
+    const toast_div = document.querySelector("#toast");
+    const title = await dioxus.recv();
+    const description = await dioxus.recv();
+
+    const toast = document.createElement("div");
+    toast.setAttribute("class", "toast_notification");
+    toast.setAttribute("style", "width: 300px");
+
+    const h1 = document.createElement("h1");
+    h1.textContent = title;
+
+    const desc = document.createElement("p");
+    desc.textContent = description + ", licensed under MIT License";
+
+    const endfield_industries = document.createElement("div");
+    endfield_industries.textContent = "Endfield Industries";
+    endfield_industries.setAttribute("style", "font-family: 'Bender'; background-color: #ff0; padding-left: 5px;");
+
+    toast.appendChild(h1);
+    toast.appendChild(desc);
+    toast.appendChild(endfield_industries);
+
+    toast_div.appendChild(toast);
+
+    setTimeout(() => {
+        const removeToast = () => toast.remove();
+        toast.addEventListener("transitionend", removeToast, { once: true });
+        toast.classList.add("fade-out");
+        setTimeout(removeToast, 500);
+    }, 2500);
+    "##,
+    );
+
+    eval.send(String::from("Baker-Dx"))?;
+    eval.send(env!("CARGO_PKG_VERSION"))?;
+
+    Ok(())
 }

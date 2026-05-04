@@ -146,3 +146,37 @@ body {
     background-color: rgb(177, 176, 176);
 }
 
+#toast {
+    position: fixed;
+    bottom: 0;
+    right: 20px;
+    z-index: 100;
+}
+
+.toast_notification {
+    background-color: rgb(220, 220, 220);
+    margin-bottom: 10px;
+    opacity: 1;
+    transition: opacity 0.5s ease-in-out;
+}
+
+.toast_notification > * {
+    color: #0f1116;
+    font-family: 'Bender';
+}
+
+.toast_notification > h1 {
+    font-size: 1.5em;
+    margin: 5px;
+    margin-bottom: 0px;
+}
+
+.toast_notification > p {
+    margin: 5px;
+    margin-top: -10px;
+}
+
+.toast_notification.fade-out {
+    opacity: 0;
+    pointer-events: none;
+}
