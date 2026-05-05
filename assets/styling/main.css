@@ -105,6 +105,34 @@ body {
     }
 }
 
+@keyframes stickerPanelRise {
+    0% {
+        clip-path: inset(100% 0 0 0);
+        transform: translateY(12px);
+    }
+
+    100% {
+        clip-path: inset(0 0 0 0);
+        transform: translateY(0);
+    }
+}
+
+.sticker-panel-pop {
+    animation: stickerPanelRise 0.18s cubic-bezier(0.18, 0.82, 0.24, 1) both;
+    transform-origin: bottom center;
+    will-change: clip-path, transform;
+}
+
+.sticker-panel-bg {
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.66), rgba(218, 217, 217, 0.78)),
+        repeating-linear-gradient(135deg,
+            rgba(255, 255, 255, 0.26) 0,
+            rgba(255, 255, 255, 0.26) 1px,
+            rgba(210, 210, 210, 0.18) 1px,
+            rgba(210, 210, 210, 0.18) 6px);
+}
+
 .typing-dots {
     display: flex;
     align-items: center;
