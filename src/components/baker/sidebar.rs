@@ -44,9 +44,9 @@ pub fn Sidebar(
             }
 
             // 底部添加按钮 (固定在底部)
-            div { class: "absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t",
+            div { class: "absolute bottom-[-3] left-0 right-0 bg-gradient-to-t",
                 button {
-                    class: "w-full h-10 px-4 rounded-full flex items-center justify-between cursor-pointer hover:brightness-95 transition-all shadow-lg",
+                    class: "w-full h-8 px-4 rounded-full flex items-center justify-between cursor-pointer hover:brightness-95 transition-all shadow-lg",
                     style: "background-color: rgb(238, 236, 236);",
                     onclick: move |_| on_add_click.call(()),
                     span {
@@ -105,7 +105,6 @@ fn ContactItem(
 
             // 选中状态下的四角装饰 (已移除)
 
-
             // 头像区域
             div { class: "relative w-[60px] h-[60px] shrink-0 mr-3",
                 // 头像容器
@@ -122,7 +121,7 @@ fn ContactItem(
                         }
                     }
                 }
-
+            
             }
 
             // 信息区域

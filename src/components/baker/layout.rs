@@ -945,7 +945,7 @@ pub fn BakerLayout() -> Element {
             }
 
             // 主内容区
-            div { class: "flex-1 flex overflow-hidden p-8 gap-8 min-h-0",
+            div { class: "flex-1 flex overflow-hidden p-8 gap-5 min-h-0",
 
                 // 左侧栏
                 Sidebar {
